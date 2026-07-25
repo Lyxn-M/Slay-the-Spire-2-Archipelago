@@ -1,7 +1,7 @@
 # 10,000 this time to create plenty of space for items and locations
 CHAR_OFFSET = 10000
 
-NUM_CUSTOM = 0
+NUM_CUSTOM = 5
 
 ASCENSIONS = {
     'SwarmingElites': 'Swarming Elites',

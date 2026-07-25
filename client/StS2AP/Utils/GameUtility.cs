@@ -83,37 +83,38 @@ namespace StS2AP.Utils
         /// <summary>
         /// Returns the Current Player's `APItemCharID`
         /// </summary>
-        public static APItemCharID? CurrentCharacterID
+        public static long? CurrentCharacterID
         {
             get
             {
-                if (CurrentPlayer == null)
+                if (CurrentConfig == null)
                 {
                     LogUtility.Warn("Attempted to get CurrentCharacterID but there is no active player");
                     return null;
                 }
-                var charName = CurrentPlayer.APName();
-                return GetCharacterIDByName(charName);
+                return CurrentConfig.CharOffset;
+                // var charName = CurrentPlayer.APName();
+                // return GetCharacterIDByName(charName);
             }
         }
 
-        /// <summary>
-        /// Gets the `APItemCharID` for a character by their AP Name.
-        /// </summary>
-        /// <param name="name">The name of a character, as recognized by the Archipelago World. Usually found by calling `.APName()` on a `CharacterModel` or `Player`.</param>
-        /// <returns>The `APItemCharID` for a given character, by it's name. Returns `null` if the character name is invalid or unknown.</returns>
-        public static APItemCharID? GetCharacterIDByName(string name)
-        {
-            return name switch
-            {
-                "Ironclad" => APItemCharID.Ironclad,
-                "Silent" => APItemCharID.Silent,
-                "Defect" => APItemCharID.Defect,
-                "Regent" => APItemCharID.Regent,
-                "Necrobinder" => APItemCharID.Necrobinder,
-                _ => null
-            };
-        }
+        // /// <summary>
+        // /// Gets the `APItemCharID` for a character by their AP Name.
+        // /// </summary>
+        // /// <param name="name">The name of a character, as recognized by the Archipelago World. Usually found by calling `.APName()` on a `CharacterModel` or `Player`.</param>
+        // /// <returns>The `APItemCharID` for a given character, by it's name. Returns `null` if the character name is invalid or unknown.</returns>
+        // public static APItemCharID? GetCharacterIDByName(string name)
+        // {
+        //     return name switch
+        //     {
+        //         "Ironclad" => APItemCharID.Ironclad,
+        //         "Silent" => APItemCharID.Silent,
+        //         "Defect" => APItemCharID.Defect,
+        //         "Regent" => APItemCharID.Regent,
+        //         "Necrobinder" => APItemCharID.Necrobinder,
+        //         _ => null
+        //     };
+        // }
 
         #region Receiving Items
 
@@ -344,33 +345,52 @@ namespace StS2AP.Utils
         /// </summary>
         public static void UnlockCharacter(ItemInfo item)
         {
-            CharacterModel? characterToUnlock = null;
-            switch(item.GetStSCharID())
+            try
             {
-                case APItemCharID.Ironclad:
-                    characterToUnlock = ModelDb.Character<Ironclad>();
-                    break;
-                case APItemCharID.Silent:
-                    characterToUnlock = ModelDb.Character<Silent>();
-                    break;
-                case APItemCharID.Defect:
-                    characterToUnlock = ModelDb.Character<Defect>();
-                    break;
-                case APItemCharID.Regent:
-                    characterToUnlock = ModelDb.Character<Regent>();
-                    break;
-                case APItemCharID.Necrobinder:
-                    characterToUnlock = ModelDb.Character<Necrobinder>();
-                    break;
-            }
+                CharacterModel? characterToUnlock = null;
+                LogUtility.Info($"Before switch");
+                switch (item.GetCharacterOffset())
+                {
+                    case (int)APItemCharID.Ironclad:
+                        characterToUnlock = ModelDb.Character<Ironclad>();
+                        break;
+                    case (int)APItemCharID.Silent:
+                        characterToUnlock = ModelDb.Character<Silent>();
+                        break;
+                    case (int)APItemCharID.Defect:
+                        characterToUnlock = ModelDb.Character<Defect>();
+                        break;
+                    case (int)APItemCharID.Regent:
+                        characterToUnlock = ModelDb.Character<Regent>();
+                        break;
+                    case (int)APItemCharID.Necrobinder:
+                        characterToUnlock = ModelDb.Character<Necrobinder>();
+                        break;
+                    default:
+                        LogUtility.Info($"Default case");
+                        var config = ArchipelagoClient.Settings.Characters.Values.FirstOrDefault(c => c.CharOffset == (int)item.GetCharacterOffset());
+                        LogUtility.Warn($"Got item unlock but character not configured {item.ItemName}");
+                        if (config != null)
+                        {
+                            characterToUnlock = ModelDb.AllCharacters.FirstOrDefault(c => string.Equals(c.Id.Entry, config.OfficialName, StringComparison.OrdinalIgnoreCase));
+                        }
+                        break;
+                }
 
-            if(characterToUnlock == null)
+                if (characterToUnlock == null)
+                {
+                    LogUtility.Warn($"Could not find character to unlock for item {item.ItemName} (Char ID Parsed: {item.GetCharacterOffset()})");
+                    return;
+                }
+
+                LogUtility.Info($"Unlocking character {characterToUnlock.Id.Entry}");
+
+                if (!ArchipelagoClient.Progress.UnlockedCharacters.Contains(characterToUnlock)) ArchipelagoClient.Progress.UnlockedCharacters.Add(characterToUnlock);
+            }
+            catch(Exception ex)
             {
-                LogUtility.Warn($"Could not find character to unlock for item {item.ItemName} (Char ID Parsed: {item.GetStSCharID().ToString()})");
-                return;
+                LogUtility.Error(ex.StackTrace);
             }
-
-            if(!ArchipelagoClient.Progress.UnlockedCharacters.Contains(characterToUnlock)) ArchipelagoClient.Progress.UnlockedCharacters.Add(characterToUnlock);
         }
 
         #endregion
@@ -504,12 +524,18 @@ namespace StS2AP.Utils
                     return;
                 }
 
-                var charName = CurrentPlayer.APName();
+                var charName = CurrentPlayer.Character.Id.Entry;
                 const string storageKey = "StS2AP_GoaledChars";
                 LogUtility.Debug($"TrySetGoalAchieved: charName - {charName}");
 
                 // Add to local cache HashSet.Add returns false if already present
+                var extras = new List<string>();
                 bool wasNew = _goaledCharacters.Add(charName);
+                foreach(var unrecognized in ArchipelagoClient.Settings.UnrecognizedCharacters.Values)
+                {
+                    wasNew |= _goaledCharacters.Add(unrecognized.OfficialName);
+                    extras.Add(unrecognized.OfficialName);
+                }
                 LogUtility.Debug($"TrySetGoalAchieved: wasNew - {wasNew.ToString()}");
 
                 if (wasNew)
@@ -526,10 +552,16 @@ namespace StS2AP.Utils
                     ArchipelagoClient.Session.DataStorage[
                         Archipelago.MultiClient.Net.Enums.Scope.Slot, storageKey]
                         .Initialize(new Newtonsoft.Json.Linq.JObject());
+
+                    var updateDict = new Dictionary<string, bool> { { charName, true } };
+                    foreach(var extra in extras)
+                    {
+                        updateDict[extra] = true;
+                    }
  
                     ArchipelagoClient.Session.DataStorage[
                         Archipelago.MultiClient.Net.Enums.Scope.Slot, storageKey]
-                        += Operation.Update(new Dictionary<string, bool> { { charName, true } });
+                        += Operation.Update(updateDict);
 
                     // Debug: Dump all values in the DataStorage
                     var ds2 = await ArchipelagoClient.Session.DataStorage[
@@ -542,7 +574,11 @@ namespace StS2AP.Utils
                     LogUtility.Success($"TrySetGoalAchieved: Recorded goal for '{charName}'. Total goaled: {_goaledCharacters.Count}");
 
                     // Now that the character has cleared, we should release all of their checks
-                    await TryReleaseAllCharacterChecks(charName);
+                    await TryReleaseAllCharacterChecks(CurrentPlayer.APName());
+                    foreach(var unrecognized in ArchipelagoClient.Settings.UnrecognizedCharacters.Values)
+                    {
+                        await TryReleaseAllCharacterChecks(unrecognized.Name);
+                    }
                 }
                 else
                 {
@@ -602,8 +638,7 @@ namespace StS2AP.Utils
                 if (!ArchipelagoClient.CheckedLocations.Contains(locationId) && locationId != -1 && ArchipelagoClient.ScoutedLocations.ContainsKey(locationId))
                 {
                     // Check the location off and let the server know
-                    ArchipelagoClient.CheckedLocations.Add(locationId);
-                    await ArchipelagoClient.Session.Locations.CompleteLocationChecksAsync(locationId);
+                    GameUtility.SendCheck(locationId);
                 }
             }
 
@@ -629,6 +664,11 @@ namespace StS2AP.Utils
 
         public static void SendCheck(long locationId)
         {
+            SendCheck(locationId, true);
+        }
+
+        private static void SendCheck(long locationId, bool includeUnrecognizedChars)
+        {
             if (!ArchipelagoClient.CheckedLocations.Contains(locationId) && locationId != -1 && ArchipelagoClient.ScoutedLocations.ContainsKey(locationId))
             {
                 // Check the location off and let the server know
@@ -636,6 +676,16 @@ namespace StS2AP.Utils
                 _ = ArchipelagoClient.Session.Locations.CompleteLocationChecksAsync(locationId);
 
                 LogUtility.Success($"Sent location check: {locationId}");
+            }
+            if(includeUnrecognizedChars)
+            {
+                foreach(var otherChar in ArchipelagoClient.Settings.UnrecognizedCharacters.Values)
+                {
+                    // - 1 because locations are offset from items by 1
+                    long newLocationId = (locationId % 10000L) + (10000L * (otherChar.CharOffset - 1));
+                    LogUtility.Info($"Sending location for unrecognized character {otherChar.OfficialName} {locationId} {newLocationId}");
+                    SendCheck(newLocationId, false);
+                }
             }
         }
 

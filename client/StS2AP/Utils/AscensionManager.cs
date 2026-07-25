@@ -140,7 +140,7 @@ namespace StS2AP.Utils
 
         public void ProcessAscensionLevel(CharacterConfig? config, ItemInfo item, bool initial)
         {
-            if(config?.CharOffset != (int) item.GetStSCharID())
+            if(config?.CharOffset != (int) item.GetCharacterOffset())
             {
                 // not for this character
                 return;

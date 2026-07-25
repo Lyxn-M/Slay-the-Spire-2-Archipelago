@@ -85,5 +85,50 @@ namespace StS2AP.Data
             { APItem._30Gold, 30 },
             { APItem.BossGold, 100 }
         };
+
+        public static bool CanBePickedUp(this APItem item)
+        {
+            switch(item)
+            {
+              case APItem.CAWCAW:
+                   return false;
+              case APItem.CardReward:
+              case APItem.RareCardReward:
+              case APItem.Relic:
+                    return true;
+              case APItem.BossRelic:
+                    return false;
+              case APItem.ProgressiveRest:
+              case APItem.ProgressiveSmith:
+              case APItem.ShopCardSlot:
+              case APItem.NeutralShopCardSlot:
+              case APItem.ShopRelicSlot:
+              case APItem.ShopPotionSlot:
+              case APItem.ProgressiveShopRemove:
+                    return false;
+              case APItem.Unlock:
+                    return false;
+              case APItem.OneGold:
+              case APItem.FiveGold:
+              case APItem._15Gold:
+              case APItem._30Gold:
+              case APItem.BossGold:
+                    return false;
+              case APItem.Potion:
+                    return true;
+              case APItem.SwarmingElites:
+              case APItem.WearyTraveler:
+              case APItem.Poverty:
+              case APItem.TightBelt:
+              case APItem.AscenderBane:
+              case APItem.Inflation:
+              case APItem.Scarcity:
+              case APItem.ToughEnemies:
+              case APItem.DeadlyEnemies:
+              case APItem.DoubleBoss:
+                    return false;
+            }
+            return false;
+        }
     }
 }

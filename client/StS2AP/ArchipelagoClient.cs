@@ -166,6 +166,8 @@ namespace StS2AP
 
         #region Networking
 
+        private static ReaderWriterLock ConnectionLock { get; } = new ReaderWriterLock();
+
         /// <summary>
         /// Attempts to connect to an Archipelago room
         /// </summary>
@@ -213,15 +215,26 @@ namespace StS2AP
             try
             {
                 // it's safe to thread this function call but Godot hates threading so do not use excessively
-                Callable.From(() => HandleConnectResult(
-                        Session.TryConnectAndLogin(
-                            Game,
-                            PlayerName,
-                            ItemsHandlingFlags.AllItems,
-                            new Version(APVersion),
-                            password: ServerPassword,
-                            requestSlotData: SlotData.Count == 0
-                        ))).CallDeferred();
+                Callable.From(() =>
+                {
+                    ConnectionLock.AcquireWriterLock(30000);
+                    try
+                    {
+                        HandleConnectResult(
+                                Session.TryConnectAndLogin(
+                                    Game,
+                                    PlayerName,
+                                    ItemsHandlingFlags.AllItems,
+                                    new Version(APVersion),
+                                    password: ServerPassword,
+                                    requestSlotData: SlotData.Count == 0
+                                ));
+                    }
+                    finally
+                    {
+                        ConnectionLock.ReleaseWriterLock();
+                    }
+                }).CallDeferred();
             }
             catch (Exception e)
             {
@@ -244,6 +257,16 @@ namespace StS2AP
                 // Store Session information
                 SlotData = success.SlotData;
                 Seed = Session.RoomState.Seed;
+
+                // Log all slot data
+                LogUtility.Info("Dumping Slot Data:");
+                foreach (var kvp in SlotData)
+                {
+                    LogUtility.Info($"KEY: {kvp.Key}");
+                    LogUtility.Info($"VAL: {kvp.Value.ToString()}");
+                }
+
+                Settings = GetPlayerSettings();
 
                 // Before we tell the user everything is okay, let's make sure that the mod version is correct
                 var apWorldVersion = "v" + (SlotData["mod_compat_version"] as string);
@@ -271,7 +294,7 @@ namespace StS2AP
 
                             // Show the connection UI again
                             ArchipelagoConnectionUI.Show();
-                            
+
                             // Disconnect from the server since we can't guarantee compatibility
                             Disconnect();
 
@@ -322,6 +345,45 @@ namespace StS2AP
             }
         }
 
+        private static void SetupUnlockedCharacters()
+        {
+            var characters = Settings.Characters;
+            var ids = new HashSet<string>(ArchipelagoClient.Progress.UnlockedCharacters.Select(c => c.Id.Entry));
+            bool someoneUnlocked = false;
+            foreach(var c in characters)
+            {
+                if(ids.Contains(c.Key))
+                {
+                    someoneUnlocked = true;
+                    break;
+                }
+            }
+            if (!someoneUnlocked)
+            {
+                // Probably someone didn't enter a modded character id correctly
+                // This is a failsafe to hopefully unlock *someone*
+                //var newResult = new List<CharacterModel>();
+                foreach (var c in ModelDb.AllCharacters)
+                {
+                    if (characters.ContainsKey(c.Id.Entry))
+                    {
+                        ArchipelagoClient.Progress.UnlockedCharacters.Add(c);
+                        break;
+                    }
+                }
+                if(ArchipelagoClient.Progress.UnlockedCharacters.Count == 0)
+                {
+                    LogUtility.Error($"No valid AP characters found to unlock!  Valid characters: {string.Join(",", characters.Keys)}; Existing: {
+                        string.Join(",", ModelDb.AllCharacters.Select(c => c.Id.Entry))}");
+                }
+                else
+                {
+                    LogUtility.Info($"Force unlocking character {ArchipelagoClient.Progress.UnlockedCharacters.First().Id.Entry}");
+                }
+                //__result = newResult;
+            }
+        }
+
         /// <summary>
         /// Fires on a successful Archipelago connection.
         /// </summary>
@@ -335,9 +397,6 @@ namespace StS2AP
 
             try
             {
-                // Get all settings for this player
-                Settings = GetPlayerSettings();
-
                 // Enable/Disable the Death Link Service based on user settings
                 LogUtility.Info($"SLOT - Is Death Link Enabled: {Settings.IsDeathLinkEnabled.ToString()}");
                 LogUtility.Info($"SLOT - Death Link Damage Percentage: {Settings.DeathLinkDamagePercent.ToString()}%");
@@ -376,16 +435,12 @@ namespace StS2AP
                     ModelDb.Character<Necrobinder>(),
                     ModelDb.Character<Defect>()
                 };
+                // TODO: need to include modded characters
                 Progress.UnlockedCharacters.AddRange(characters);
             }
 
-            // Log all slot data
-            LogUtility.Info("Dumping Slot Data:");
-            foreach (var kvp in SlotData)
-            {
-                LogUtility.Info($"KEY: {kvp.Key}");
-                LogUtility.Info($"VAL: {kvp.Value.ToString()}");
-            }
+            SetupUnlockedCharacters();
+
 
             // Pre-scout all locations so we have item info available for notifications
             ThreadPool.QueueUserWorkItem(_ => PreScoutAllLocations());
@@ -529,20 +584,29 @@ namespace StS2AP
         /// </summary>
         private static void OnItemReceived(ReceivedItemsHelper helper)
         {
-            // Deal with this Item
-            lock (_itemLock)
+            ConnectionLock.AcquireReaderLock(120000);
+
+            try
             {
-                // Grab the item data
-                var receivedItem = helper.DequeueItem();
+                // Deal with this Item
+                lock (_itemLock)
+                {
+                    // Grab the item data
+                    var receivedItem = helper.DequeueItem();
 
-                // Ignore if this item is an old message
-                if (helper.Index <= Index) return;
+                    // Ignore if this item is an old message
+                    if (helper.Index <= Index) return;
 
-                // Process it
-                ProcessItem(receivedItem, helper.Index);
-                
-                // Keep track of how many messages we've had so far
-                Index++;
+                    // Process it
+                    ProcessItem(receivedItem, helper.Index);
+
+                    // Keep track of how many messages we've had so far
+                    Index++;
+                }
+            }
+            finally
+            {
+                ConnectionLock.ReleaseReaderLock();
             }
 
         }
@@ -593,13 +657,24 @@ namespace StS2AP
                 // Character Unlocks
                 case APItem.Unlock:
                     {
+                        LogUtility.Info("Before GameUtility Unlock");
                         GameUtility.UnlockCharacter(item);
+                        LogUtility.Info("After GameUtility Unlock");
 
                         // Fire the CharacterUnlocked event on the Godot main thread.
                         // This allows the character select screen (if open) to immediately
                         // refresh the appropriate button without waiting for OnSubmenuOpened.
-                        var charId = item.GetStSCharID();
-                        Callable.From(() => CharacterUnlocked?.Invoke(charId)).CallDeferred();
+                        var offset = item.GetCharacterOffset();
+                        LogUtility.Info("After offset acquisition");
+                        var config = ArchipelagoClient.Settings.Characters.Values.FirstOrDefault(config => config.CharOffset == offset);
+                        LogUtility.Info("After Settings check");
+                        if(config == null)
+                        {
+                            LogUtility.Warn($"Got Unlock for character not configured {item.ItemId}");
+                            break;
+                        }
+                        LogUtility.Info("after config null check");
+                        Callable.From(() => CharacterUnlocked?.Invoke(config)).CallDeferred();
 
                         break;
                     }
@@ -609,7 +684,7 @@ namespace StS2AP
                     {
                         // Get the IDs for storing the item
                         var itemId = item.GetRawItemID();
-                        var playerId = item.GetStSCharID();
+                        var offset = item.GetCharacterOffset();
 
                         // Add the Smith/Rest to the amount we've received for this character
                         var source = itemId == APItem.ProgressiveSmith ? Progress.ProgressiveSmiths : Progress.ProgressiveRests;
@@ -617,10 +692,10 @@ namespace StS2AP
                         // Increment the reward
                         try
                         {
-                            var haveKey = source.TryGetValue(playerId, out int amount);
+                            var haveKey = source.TryGetValue(offset, out int amount);
                             if (!haveKey) amount = 0;
-                            source[playerId] = amount + 1;
-                            LogUtility.Success($"New Value for {(itemId == APItem.ProgressiveSmith ? "ProgressiveSmiths" : "ProgressiveRests")} is {source[playerId]}");
+                            source[offset] = amount + 1;
+                            LogUtility.Success($"New Value for {(itemId == APItem.ProgressiveSmith ? "ProgressiveSmiths" : "ProgressiveRests")} is {source[offset]}");
                         }
                         catch (KeyNotFoundException e)
                         {
@@ -641,15 +716,15 @@ namespace StS2AP
                 case APItem.BossGold:
                     {
                         // Get the IDs for storing the item
-                        var playerId = item.GetStSCharID();
+                        var charOffset = item.GetCharacterOffset();
                         var itemId = item.GetRawItemID();
 
                         // Add the Gold to the amount we've received
                         try
                         {
-                            var haveKey = Progress.GoldReceived.TryGetValue(playerId, out int gold);
+                            var haveKey = Progress.GoldReceived.TryGetValue(charOffset, out int gold);
                             if (!haveKey) gold = 0;
-                            Progress.GoldReceived[playerId] = gold + ItemTable.GoldItemAmounts[itemId];
+                            Progress.GoldReceived[charOffset] = gold + ItemTable.GoldItemAmounts[itemId];
                         }
                         catch (KeyNotFoundException e)
                         {
@@ -750,7 +825,15 @@ namespace StS2AP
                         }
                     }
                 }
-
+                
+                foreach(var config in settings.Characters.Values)
+                {
+                    var model = ModelDb.AllCharacters.FirstOrDefault(model => string.Equals(model.Id.Entry, config.OfficialName, StringComparison.OrdinalIgnoreCase));
+                    if(model == null)
+                    {
+                        settings.UnrecognizedCharacters[config.OfficialName] = config;
+                    }
+                }
                 
             }
 
@@ -775,9 +858,9 @@ namespace StS2AP
 
         /// <summary>
         /// Fires when a character unlock item is received and processed.
-        /// Passes the <see cref="APItemCharID"/> of the character that was just unlocked.
+        /// Passes the <see cref="CharacterConfig"/> of the character that was just unlocked.
         /// Always dispatched on the Godot main thread via CallDeferred so UI can safely respond.
         /// </summary>
-        public static event Action<APItemCharID> CharacterUnlocked;
+        public static event Action<CharacterConfig> CharacterUnlocked;
     }
 }

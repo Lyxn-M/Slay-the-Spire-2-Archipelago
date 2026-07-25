@@ -250,7 +250,7 @@ namespace StS2AP.Models
         /// The number of items we've received from the multiworld that we haven't used yet. 
         /// This is what gets displayed in the top bar UI.
         /// </summary>
-        public int UnusedItemCount => AllReceivedItems.Where(i => i.Item.GetStSCharID() == GameUtility.CurrentCharacterID && !i.Item.ItemDisplayName.Contains("Progressive") && !i.Item.ItemName.Contains("Progressive")).Count() - UsedItems.Count;
+        public int UnusedItemCount => AllReceivedItems.Where(i => i.Item.GetCharacterOffset() == GameUtility.CurrentConfig?.CharOffset && !i.Item.ItemDisplayName.Contains("Progressive") && !i.Item.ItemName.Contains("Progressive")).Count() - UsedItems.Count;
 
         #endregion
 
@@ -259,7 +259,7 @@ namespace StS2AP.Models
         /// <summary>
         /// ALL Gold received from the Multiworld
         /// </summary>
-        public Dictionary<APItemCharID, int> GoldReceived { get; set; } = new Dictionary<APItemCharID, int>();
+        public Dictionary<long, int> GoldReceived { get; set; } = new Dictionary<long, int>();
 
         /// <summary>
         /// The Gold you've redeemed so far this run
@@ -276,8 +276,12 @@ namespace StS2AP.Models
             {
                 try
                 {
-                    if (!GameUtility.CurrentCharacterID.HasValue) return -1;
-                    GoldReceived.TryGetValue(GameUtility.CurrentCharacterID.Value, out int gold);
+                    var config = GameUtility.CurrentConfig;
+                    if(config == null)
+                    {
+                        return -1;
+                    }
+                    GoldReceived.TryGetValue(config.CharOffset, out int gold);
                     return gold - GoldRedeemed;
                 }
                 catch
@@ -305,21 +309,21 @@ namespace StS2AP.Models
         /// <summary>
         /// Keeps track of the number of Progressive Smiths we've received for each character
         /// </summary>
-        public Dictionary<APItemCharID, int> ProgressiveSmiths = new Dictionary<APItemCharID, int>();
+        public Dictionary<long, int> ProgressiveSmiths = new Dictionary<long, int>();
 
         /// <summary>
         /// Keeps track of the number of Progressive Rests we've received for each character
         /// </summary>
-        public Dictionary<APItemCharID, int> ProgressiveRests = new Dictionary<APItemCharID, int>();
+        public Dictionary<long, int> ProgressiveRests = new Dictionary<long, int>();
 
         /// <summary>
         /// Gets the highest Act that a character can rest at
         /// </summary>
-        /// <param name="character">The Character's encoded ItemID</param>
+        /// <param name="character">The Character's offset</param>
         /// <returns>The highest Act (one-based) that the character can rest at</returns>
-        public int? MaxRestLevel(APItemCharID character)
+        public int? MaxRestLevel(long offset)
         {
-            var canRest = ProgressiveRests.TryGetValue(character, out int act);
+            var canRest = ProgressiveRests.TryGetValue(offset, out int act);
             if (!canRest) return null;
             return act;
         }
@@ -327,11 +331,11 @@ namespace StS2AP.Models
         /// <summary>
         /// Gets the highest Act that a character can smith at
         /// </summary>
-        /// <param name="character">The Character's encoded ItemID</param>
+        /// <param name="character">The Character's offset</param>
         /// <returns>The highest Act (one-based) that the character can smith at</returns>
-        public int? MaxSmithLevel(APItemCharID character)
+        public int? MaxSmithLevel(long offset)
         {
-            var canSmith = ProgressiveSmiths.TryGetValue(character, out int act);
+            var canSmith = ProgressiveSmiths.TryGetValue(offset, out int act);
             if (!canSmith) return null;
             return act;
         }

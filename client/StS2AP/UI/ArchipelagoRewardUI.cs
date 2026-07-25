@@ -209,10 +209,10 @@ namespace StS2AP.UI
 
             // Get Unused items from the Multiworld for our current character
             var availableItems = ArchipelagoClient.Progress.AllReceivedItems
-                                .Where(i => !ArchipelagoClient.Progress.UsedItems.Contains(i.Index) && i.Item.GetStSCharID() == GameUtility.CurrentCharacterID);
+                                .Where(i => !ArchipelagoClient.Progress.UsedItems.Contains(i.Index) && i.Item.GetCharacterOffset() == GameUtility.CurrentCharacterID);
             
             // Prepare them for the UI
-            var rewardDataList = availableItems.Where(i => !i.Item.ItemDisplayName.Contains("Progressive") && !i.Item.ItemName.Contains("Progressive")).Select(i =>
+            var rewardDataList = availableItems.Where(i => i.Item.GetRawItemID().CanBePickedUp()).Select(i =>
             {
                 var data = new ArchipelagoRewardData
                 {

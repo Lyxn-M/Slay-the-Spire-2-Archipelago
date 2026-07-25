@@ -28,18 +28,29 @@ namespace StS2AP
             return (APItem)(item.ItemId % 10000L);
         }
 
-        /// <summary>
-        /// Similar to the function above, but it extracts the Character ID of the Item from the ItemInfo object.
-        /// </summary>
-        public static APItemCharID GetStSCharID(this ItemInfo item)
+        // /// <summary>
+        // /// Similar to the function above, but it extracts the Character ID of the Item from the ItemInfo object.
+        // /// </summary>
+        // public static APItemCharID GetStSCharID(this ItemInfo item)
+        // {
+        //     if (item is null || item.ItemId < 0)
+        //     {
+        //         LogUtility.Error($"Could not Parse Raw Character ID for Item #{item?.ItemId}");
+        //         return 0L;
+        //     }
+        //     return (APItemCharID)(Math.Abs(item.ItemId) / 10000L);
+        // }
+
+        public static long GetCharacterOffset(this ItemInfo item)
         {
-            if (item is null || item.ItemId < 0)
+            if(item is null || item.ItemId < 0)
             {
-                LogUtility.Error($"Could not Parse Raw Character ID for Item #{item?.ItemId}");
+                LogUtility.Error($"Could not Parse Raw Character offset ID for Item #{item?.ItemId}");
                 return 0L;
             }
-            return (APItemCharID)(Math.Abs(item.ItemId) / 10000L);
+            return (Math.Abs(item.ItemId) / 10000L);
         }
+
         public static bool Advancement(this ItemInfo info)
         {
             return (info.Flags & Archipelago.MultiClient.Net.Enums.ItemFlags.Advancement) > 0;

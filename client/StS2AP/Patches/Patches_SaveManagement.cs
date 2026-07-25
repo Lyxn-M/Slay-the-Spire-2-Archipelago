@@ -64,7 +64,7 @@ namespace StS2AP.Patches
                     return;
                 }
                 var saveDict = new Dictionary<string, string>();
-                saveDict[GameUtility.CurrentPlayer.APName()] = zipped;
+                saveDict[GameUtility.CurrentPlayer.getInternalName()] = zipped;
                 ArchipelagoClient.Session.DataStorage[Scope.Slot, $"StS2AP_Saves"]
                     += Operation.Update(saveDict);
             }
@@ -169,7 +169,7 @@ namespace StS2AP.Patches
                         SfxCmd.Play(runState.Players[0].Character.CharacterTransitionSfx);
 
                         GameUtility.CurrentPlayer = runState.Players[0];
-                        GameUtility.CurrentConfig = ArchipelagoClient.Settings.Characters[GameUtility.CurrentPlayer.APName()];
+                        GameUtility.CurrentConfig = ArchipelagoClient.Settings.Characters[GameUtility.CurrentPlayer.getInternalName()];
                         ArchipelagoClient.Progress = ArchipelagoProgress.FromSerializable(result, GameUtility.CurrentPlayer);
                         ArchipelagoClient.ReprocessItems();
                         ArchipelagoClient.Progress.InitializeFromServer(GameUtility.CurrentPlayer);

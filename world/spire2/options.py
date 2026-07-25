@@ -6,6 +6,7 @@ from typing import List
 from Options import OptionSet, Range, Toggle, Visibility, Choice, TextChoice, OptionDict, OptionCounter, \
     PerGameCommonOptions, OptionGroup, DeathLink
 
+import schema
 from schema import Schema, Optional, And
 
 from .characters import character_list
@@ -23,6 +24,24 @@ class Characters(OptionSet):
     valid_keys = character_list
     default = ["Ironclad"]
     valid_keys_casefold = False
+
+class ModdedCharacters(OptionSet):
+    """Enter the list of modded characters to play as.  These must be the internal names of the
+    characters.  This option is ignored if use_advanced_characters is set to true.  Only 5
+    modded characters are allowed.
+
+    If using a modded character:
+    Enter the internal ID of the character to use.
+
+    If you don't know the exact ID to enter with the mod installed go to
+    `Archipelago Settings -> Archipelago` to view a list of installed modded character IDs.
+
+    If the chosen character mod is not installed, checks will be sent when another character
+    sends them.  If none of the chosen character mods are installed, you will be playing
+    a very boring Ironclad run.
+    """
+    display_name = "Modded Characters"
+    default = []
 
 class GoalNumChar(Range):
     """How many characters you need to complete a run with before you goal. 0 means all characters"""
@@ -195,7 +214,6 @@ class CardReward(Toggle):
 
 class SeededRun(Toggle):
     """Whether each character should have a fixed seed to climb the spire with or not."""
-    visibility = Visibility.none
     display_name = "Seeded Run"
     default = 0
 
@@ -203,7 +221,7 @@ class AdvancedChar(Toggle):
     """Whether to use the advanced characters feature. The normal options for character, ascension, etc. are ignored.
     See the "advanced_characters" option.
     """
-    visibility = Visibility.none
+    visibility = Visibility.template
     display_name = "Advanced Characters"
     option_true = 1
     option_false = 0
@@ -214,14 +232,16 @@ class CharacterOptions(OptionDict):
     independently of each other.  No validation is done on the character name, so use carefully.
     Format is:
         <char name>:
-            ascension: <number>
-            ascension_down: <number>
+            ascension:
+                - <string or number>
+            ascension_down:
+                - <string or number>
 
     If using a modded character:
     Enter the internal ID of the character to use.
 
-     if you don't know the exact ID to enter with the mod installed go to
-    `Mods -> Archipelago Multi-world -> config` to view a list of installed modded character IDs.
+    If you don't know the exact ID to enter with the mod installed go to
+    `Archipelago Settings -> Archipelago` to view a list of installed modded character IDs.
 
     If the chosen character mod is not installed, checks will be sent when another character
     sends them.  If none of the chosen character mods are installed, you will be playing
@@ -229,19 +249,19 @@ class CharacterOptions(OptionDict):
     """
     # For those wondering why on earth there's an advanced character option
     # it's to support modded characters.
-    visibility = Visibility.none
+    visibility = Visibility.template
     default = {
         "ironclad": {
-            "ascension": 1,
+            "ascension": [1],
             # "final_act": 1,
-            "ascension_down": 0,
+            "ascension_down": [],
         }
     }
     schema = Schema({
         str: {
-            Optional("ascension", default=1): And(int,lambda n: 0 <= n <= 10),
+            Optional("ascension", default=[1]): [And(int,lambda n: 1 <= n <= 10), str],
             # Optional("final_act", default=0): And(int, lambda n: 0 <= n <= 1),
-            Optional("ascension_down", default=0): And(int, lambda n: 0 <= n <= 10),
+            Optional("ascension_down", default=[]): [And(int,lambda n: 1 <= n <= 10), str],
         }
     })
 
@@ -349,6 +369,7 @@ class Spire2Options(PerGameCommonOptions):
     enable_death_fragments: EnableDeathFragments
     death_link_damage_percent: DeathLinkDamagePercent
     characters: Characters
+    modded_characters: ModdedCharacters
     pick_num_characters: PickNumberCharacters
     num_chars_goal: GoalNumChar
     lock_characters: LockCharacters

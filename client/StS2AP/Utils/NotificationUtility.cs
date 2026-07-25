@@ -161,18 +161,21 @@ namespace StS2AP.Utils
                 case APItem.Potion:
                         return @"[img]res://images/packed/sprite_fonts/potion_icon.png[/img]";
                 case APItem.Unlock:
-                        switch (item.GetStSCharID())
+                        switch (item.GetCharacterOffset())
                         {
-                            case APItemCharID.Ironclad:
+                            case (int) APItemCharID.Ironclad:
                                     return @"[img]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
-                            case APItemCharID.Silent:
+                            case (int) APItemCharID.Silent:
                                     return @"[img]res://images/packed/sprite_fonts/silent_energy_icon.png[/img]";
-                            case APItemCharID.Defect:
+                            case (int) APItemCharID.Defect:
                                     return @"[img]res://images/packed/sprite_fonts/defect_energy_icon.png[/img]";
-                            case APItemCharID.Necrobinder:
+                            case (int) APItemCharID.Necrobinder:
                                     return @"[img]res://images/packed/sprite_fonts/necrobinder_energy_icon.png[/img]";
-                            case APItemCharID.Regent:
+                            case (int) APItemCharID.Regent:
                                     return @"[img]res://images/packed/sprite_fonts/regent_energy_icon.png[/img]";
+                            default:
+                                    // TODO: What to do for modded characters?
+                                    return @"[img]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
                         }
                     return null;
             }

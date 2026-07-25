@@ -1,4 +1,5 @@
-﻿using StS2AP.Models;
+﻿using MegaCrit.Sts2.Core.Models;
+using StS2AP.Models;
 using StS2AP.UI;
 using StS2AP.Utils;
 using STS2RitsuLib;
@@ -101,11 +102,46 @@ public static class ModSettingsRegistration
                 page.WithTitle(ModSettingsText.Literal("Archipelago Settings"))
                     .WithModDisplayName(ModSettingsText.Literal("Archipelago"))
                     .WithMenuCapabilities(ModSettingsMenuCapabilities.None)
+                    .AddSection("charnames", ConfigureModdedCharactersSection)
                     .AddSection("keybinds", ConfigureKeybindsSection)
                     .AddSection("notifications", ConfigureNotificationsSection)
                     .AddSection("deathlink", ConfigureDeathLinkSection)
         );
         RegisterHotkeys();
+    }
+
+    private static void ConfigureModdedCharactersSection(ModSettingsSectionBuilder section)
+    {
+        section.WithTitle(ModSettingsText.Literal("Installed Characters"))
+                .WithDescription(ModSettingsText.Literal("Internal Names of Installed Modded Characters"))
+                .AddInfoCard("ap-modded-chars", ModSettingsText.Literal("Character Names"), ModSettingsText.Dynamic(GetModdedNames));
+
+    }
+
+    private static string GetModdedNames()
+    {
+        StringWriter sw =  new StringWriter();
+        var moddedChars = ModelDb.AllCharacters.Where(c => {
+            if(!c.IsPlayable)
+            {
+                return false;
+            }
+            switch(c.Id.Entry)
+            {
+                case "IRONCLAD":
+                case "SILENT":
+                case "REGENT":
+                case "DEFECT":
+                case "NECROBINDER":
+                    return false;
+            }
+            return true;
+        });
+        foreach(var c in moddedChars)
+        {
+            sw.WriteLine(c.Id.Entry);
+        }
+        return sw.ToString();
     }
 
     /// <summary>

@@ -21,10 +21,15 @@ namespace StS2AP.Data
         private static long CombineLocationAndCharacterIds(long locationId, CharacterModel character)
         {
             // Character offset (for locations this is zero-based, so it needs to be shifted)
-            long _characterOffset = character.GetAPLocationCharID();
+            long? _characterOffset = character.GetCharacterOffset();
+            if(_characterOffset == null)
+            {
+                LogUtility.Error($"Got unsupported character {character.APName()}");
+                return -1;
+            }
 
             // Place the character offset in the leftmost position and location ID in the rightmost 4 digits (zero-padded)
-            return (_characterOffset * 10000) + locationId;
+            return (long) _characterOffset + locationId;
         }
 
         /// <summary>
