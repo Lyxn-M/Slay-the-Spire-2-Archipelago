@@ -119,6 +119,10 @@ class Ascension(OptionSet):
 #     display_name = "Final Act"
 #     default = 0
 
+class NeowSanity(Toggle):
+    """Whether to shuffle Neow giving you a start of run bonus or not."""
+    display_name = "Neow Sanity"
+    default = 0
 
 class IncludeFloorChecks(Toggle):
     """Whether to include reaching new floors as a location.  Adds small amounts of gold as items."""
@@ -384,6 +388,7 @@ class Spire2Options(PerGameCommonOptions):
     filler_weights: FillerWeights
     # trap_chance: TrapChance
     # trap_weights: TrapWeights
+    neow_sanity: NeowSanity
     campfire_sanity: CampfireSanity
     gold_sanity: GoldSanity
     potion_sanity: PotionSanity
