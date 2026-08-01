@@ -6,6 +6,12 @@ from .options import (
     LockCharacters, UnlockedCharacter, Ascension,
     IncludeFloorChecks, CampfireSanity, GoldSanity, PotionSanity,
     CardReward,
+    OneGoldFillerWeight, FiveGoldFillerWeight,
+    FreeAttackFillerWeight, FreePowerFillerWeight, FreeSkillFillerWeight,
+    DexterityFillerWeight, StrengthFillerWeight, PlatingFillerWeight,
+    FriendshipFillerWeight, PostCombatCardUpgradeFillerWeight, PostCombatCardRemovalFillerWeight,
+    AdditionalCardRewardFillerWeight, BufferFillerWeight, VigorFillerWeight, ThornsFillerWeight, ArtifactFillerWeight,
+    SingleColorlessCardFillerWeight,
 )
 
 # The info needed for the Archipelago Website, not the actual `apworld`
@@ -17,7 +23,7 @@ class SlayTheSpire2Web(WebWorld):
             "English",
             "setup_en.md",
             "setup/en",
-            ["Kirbyfanner"]
+            ["Kirbyfanner", "Platano Bailando", "Lyxn"]
         )
     ]
 
@@ -40,5 +46,24 @@ class SlayTheSpire2Web(WebWorld):
             DeathLink,
             EnableDeathFragments,
             DeathLinkDamagePercent,
-        ])
+        ]),
+        OptionGroup("Filler Items", [
+            OneGoldFillerWeight,
+            FiveGoldFillerWeight,
+            FreeAttackFillerWeight,
+            FreePowerFillerWeight,
+            FreeSkillFillerWeight,
+            DexterityFillerWeight,
+            StrengthFillerWeight,
+            PlatingFillerWeight,
+            FriendshipFillerWeight,
+            PostCombatCardUpgradeFillerWeight,
+            PostCombatCardRemovalFillerWeight,
+            AdditionalCardRewardFillerWeight,
+            BufferFillerWeight,
+            VigorFillerWeight,
+            ThornsFillerWeight,
+            ArtifactFillerWeight,
+            #SingleColorlessCardFillerWeight,
+        ]),
     ]
