@@ -216,9 +216,9 @@ class SlayTheSpire2World(World):
                         break
                 return ret
             except:
-                return {asc.lower() for asc in ascensions}
+                return {asc.lower() for asc in ascension_downs}
 
-        for asc in ascensions:
+        for asc in ascension_downs:
             try:
                 number = int(asc)
                 ret.add(ASCENSION_LIST[number - 1].lower())

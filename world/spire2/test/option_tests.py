@@ -63,3 +63,24 @@ class TestAscensionDowns(Spire2TestBase):
                 break
         else:
             raise Exception("Failed to find ascension down")
+
+class TestAscensionDownNumbers(Spire2TestBase):
+    options = {
+        "characters": [
+            "silent"
+        ],
+        "ascension": ["10"],
+        "ascension_down": ["10","9", "8"],
+    }
+
+    def test_has_double_boss(self):
+        for item in self.world.multiworld.itempool:
+            if 'Double Boss' in item.name:
+                break
+        else:
+            raise Exception("Failed to find Double Boss")
+
+    def test_no_swarming_elites(self):
+        for item in self.world.multiworld.itempool:
+            if 'Swarming Elites' in item.name:
+                raise Exception("Found Swarming Elites")
