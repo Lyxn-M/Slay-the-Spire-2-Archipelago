@@ -84,3 +84,13 @@ class TestAscensionDownNumbers(Spire2TestBase):
         for item in self.world.multiworld.itempool:
             if 'Swarming Elites' in item.name:
                 raise Exception("Found Swarming Elites")
+
+
+class TestBasicModdedChars(Spire2TestBase):
+    options = {
+        "characters": {
+            "Ironclad",
+            "Silent"
+        },
+        "modded_characters": ["WATCHER-WATCHER"]
+    }

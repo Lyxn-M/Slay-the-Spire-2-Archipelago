@@ -369,7 +369,8 @@ namespace StS2AP
         {
             var characters = Settings.Characters;
             var ids = new HashSet<string>(
-                ArchipelagoClient.Progress.UnlockedCharacters.Select(c => c.Id.Entry)
+                Progress.UnlockedCharacters.Select(c => c.Id.Entry),
+                StringComparer.InvariantCultureIgnoreCase
             );
             bool someoneUnlocked = false;
             foreach (var c in characters)
@@ -389,11 +390,11 @@ namespace StS2AP
                 {
                     if (characters.ContainsKey(c.Id.Entry))
                     {
-                        ArchipelagoClient.Progress.UnlockedCharacters.Add(c);
+                        Progress.UnlockedCharacters.Add(c);
                         break;
                     }
                 }
-                if (ArchipelagoClient.Progress.UnlockedCharacters.Count == 0)
+                if (Progress.UnlockedCharacters.Count == 0)
                 {
                     LogUtility.Error(
                         $"No valid AP characters found to unlock!  Valid characters: {string.Join(",", characters.Keys)}; Existing: {
@@ -403,7 +404,7 @@ namespace StS2AP
                 else
                 {
                     LogUtility.Info(
-                        $"Force unlocking character {ArchipelagoClient.Progress.UnlockedCharacters.First().Id.Entry}"
+                        $"Force unlocking character {Progress.UnlockedCharacters.First().Id.Entry}"
                     );
                 }
                 //__result = newResult;
@@ -791,6 +792,46 @@ namespace StS2AP
 
                     break;
                 }
+                // Shop slot unlocks (cards/neutral/relic/potion) and Progressive Shop Remove.
+                case APItem.ShopCardSlot:
+                case APItem.NeutralShopCardSlot:
+                case APItem.ShopRelicSlot:
+                case APItem.ShopPotionSlot:
+                case APItem.ProgressiveShopRemove:
+                    {
+                        // Get the IDs for storing the item
+                        var itemId = item.GetCharacterSpecificItemID();
+                        var playerId = item.GetCharacterOffset();
+
+                        // Route to the matching per-category tracker
+                        var source = itemId switch
+                        {
+                            APItem.ShopCardSlot => Progress.ShopCardSlotsReceived,
+                            APItem.NeutralShopCardSlot => Progress.ShopNeutralSlotsReceived,
+                            APItem.ShopRelicSlot => Progress.ShopRelicSlotsReceived,
+                            APItem.ShopPotionSlot => Progress.ShopPotionSlotsReceived,
+                            _ => Progress.ShopRemovesReceived,
+                        };
+
+                        // Increment the reward
+                        try
+                        {
+                            var haveKey = source.TryGetValue(playerId, out int amount);
+                            if (!haveKey) amount = 0;
+                            source[playerId] = amount + 1;
+                            LogUtility.Success($"New Value for {itemId} is {source[playerId]}");
+                        }
+                        catch (KeyNotFoundException e)
+                        {
+                            LogUtility.Error($"Shop slot tracker does not have a value for this character! ({item.ItemDisplayName} from {item.Player.Name})");
+                        }
+                        catch
+                        {
+                            LogUtility.Error($"Failed to process Shop Slot item when this item was received: ({item.ItemDisplayName} from {item.Player.Name})");
+                        }
+
+                        break;
+                    }
                 case APItem.SwarmingElites:
                 case APItem.WearyTraveler:
                 case APItem.Poverty:
@@ -1005,6 +1046,34 @@ namespace StS2AP
 
             if (slotData.ContainsKey("include_floor_checks"))
                 settings.Floorsanity = Convert.ToInt32(slotData["include_floor_checks"]) != 0;
+
+            if (slotData.ContainsKey("shop_sanity"))
+                settings.ShopSanity = Convert.ToInt32(slotData["shop_sanity"]) != 0;
+                
+            if (slotData.ContainsKey("shop_sanity_options") && slotData["shop_sanity_options"] is Newtonsoft.Json.Linq.JObject shopOptions)
+            {
+                if (shopOptions.TryGetValue("card_slots", out var cardSlotsToken))
+                    settings.ShopCardSlots = Convert.ToInt32(cardSlotsToken);
+
+                if (shopOptions.TryGetValue("neutral_slots", out var neutralSlotsToken))
+                    settings.ShopNeutralSlots = Convert.ToInt32(neutralSlotsToken);
+
+                if (shopOptions.TryGetValue("relic_slots", out var relicSlotsToken))
+                    settings.ShopRelicSlots = Convert.ToInt32(relicSlotsToken);
+
+                if (shopOptions.TryGetValue("potion_slots", out var potionSlotsToken))
+                    settings.ShopPotionSlots = Convert.ToInt32(potionSlotsToken);
+
+                if (shopOptions.TryGetValue("card_remove", out var cardRemoveToken))
+                    settings.ShopRemoveSlots = Convert.ToBoolean(cardRemoveToken);
+
+                if (shopOptions.TryGetValue("costs", out var costsToken))
+                    settings.ShopSanityCosts = Convert.ToInt32(costsToken);
+            }
+            else if (settings.ShopSanity)
+            {
+                LogUtility.Warn("ShopSanity is enabled but 'shop_sanity_options' was missing or not the expected object shape — all shop slots will read as unlocked.");
+            }
 
             // And return it
             return settings;

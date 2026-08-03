@@ -353,6 +353,18 @@ namespace StS2AP.Models
             if (!canSmith) return null;
             return act;
         }
+        public Dictionary<long, int> ShopCardSlotsReceived = new Dictionary<long, int>();
+        public Dictionary<long, int> ShopNeutralSlotsReceived = new Dictionary<long, int>();
+        public Dictionary<long, int> ShopRelicSlotsReceived = new Dictionary<long, int>();
+        public Dictionary<long, int> ShopPotionSlotsReceived = new Dictionary<long, int>();
+        public Dictionary<long, int> ShopRemovesReceived = new Dictionary<long, int>();
+        public int? MaxShopRemoveLevel(long character)
+        {
+            var canRemove = ShopRemovesReceived.TryGetValue(character, out int act);
+            if (!canRemove) return null;
+            return act;
+        }
+        public Dictionary<string, bool> ShopSlotsChecked { get; set; } = new Dictionary<string, bool>();
 
         /// <summary>
         /// Returns the highest Act that a character can receive Ancient Rewards at

@@ -124,17 +124,39 @@ class SlayTheSpire2World(World):
         return unlocked_char
 
     def _handle_basic_chars(self) -> None:
-        selected_chars = sorted(self.options.characters.value)
+        selected_chars = list(self.options.characters.value)
+        selected_chars.extend(self.options.modded_characters.value)
+        char_options = sorted(selected_chars)
         num_rand_chars = self.options.pick_num_characters.value
-        unlocked_char = self._get_unlocked_char(selected_chars)
-        if num_rand_chars != 0 and num_rand_chars < len(selected_chars):
+        unlocked_char = self._get_unlocked_char(char_options)
+        include_ascension_down = self.options.include_floor_checks.value != 0
+        if num_rand_chars != 0 and num_rand_chars < len(char_options):
+            selected_chars = list(char_options)
             if self.options.lock_characters.value != 0:
-                selected_chars.remove(unlocked_char)
+                if unlocked_char in selected_chars:
+                    selected_chars.remove(unlocked_char)
                 selected_chars = [unlocked_char] + self.random.sample(selected_chars, k=num_rand_chars - 1)
             else:
                 selected_chars = self.random.sample(selected_chars, k=num_rand_chars)
+            modded_num = 0
+            modded_chars = []
+            for char in selected_chars:
+                if character_offset_map.get(char.lower(), None) is None:
+                    modded_num += 1
+                    modded_chars.append(char)
+            if modded_num > NUM_CUSTOM:
+                supported_chars = sorted(
+                    {x for x in char_options if x.lower() in character_offset_map and x not in selected_chars})
+                replace_num = modded_num - NUM_CUSTOM
+                if unlocked_char in modded_chars:
+                    modded_chars.remove(unlocked_char)
+                remove_me = self.random.sample(modded_chars, k=replace_num)
+                for remove in remove_me:
+                    selected_chars.remove(remove)
+                selected_chars += self.random.sample(supported_chars, k=min(replace_num, len(supported_chars)))
+        else:
+            selected_chars = char_options
 
-        # self.logger.info("Generating with characters %s", selected_chars)
         ascension_down: typing.Set[str] = self.options.ascension_down.value
         ascension: typing.Set[str] = self.options.ascension.value
         ascension = self._to_ascensions(ascension)
@@ -143,42 +165,36 @@ class SlayTheSpire2World(World):
             ascension_down = set()
         ascension_down = ascension.intersection(ascension_down)
 
-        for char_val in selected_chars:
-            option_name = char_val
-            char_offset = character_offset_map[option_name.lower()]
-            name = character_list[char_offset - 1]
+        for option_name in selected_chars:
+            mod_num = 0
+            char_offset = character_offset_map.get(option_name.lower(), None)
+            if char_offset is None:
+                self.modded_num += 1
+                mod_num = self.modded_num
+                char_offset = mod_num + len(character_list)
+                name = f"Custom Character {mod_num}"
+            else:
+                name = character_list[char_offset - 1]
             if self.options.seeded:
-                seed = "".join(self.random.choice(string.ascii_letters) for i in range(12))
+                seed = "".join(self.random.choice(string.ascii_letters) for i in range(16))
             else:
                 seed = ""
             locked = False if unlocked_char is None or unlocked_char.lower() == option_name.lower() else True
+
+            if not include_ascension_down:
+                ascension_down = set()
+            ascension_down = ascension.intersection(ascension_down)
             config = CharacterConfig(name,
                                      option_name,
                                      char_offset,
-                                     0,
+                                     mod_num,
                                      seed,
                                      locked,
                                      ascension=ascension,
                                      ascension_down=ascension_down)
             self.characters.append(config)
-
-        for index, modded_char in enumerate(sorted(self.options.modded_characters.value)):
-            if self.options.seeded:
-                seed = "".join(self.random.choice(string.ascii_letters) for i in range(12))
-            else:
-                seed = ""
-            locked = False if unlocked_char is None or unlocked_char.lower() == modded_char else True
-            offset = index + len(character_list)
-            config = CharacterConfig(modded_char,
-                                     modded_char,
-                                     offset,
-                                     index,
-                                     seed,
-                                     locked,
-                                     ascension=ascension,
-                                     ascension_down=ascension_down)
-            self.characters.append(config)
-            self.modded_chars.append(config)
+            if config.mod_num > 0:
+                self.modded_chars.append(config)
 
 
     def _to_ascensions(self, ascensions: typing.Set[str]) -> typing.Set[str]:
