@@ -7,7 +7,6 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Characters;
-using MegaCrit.Sts2.Core.Saves.Runs;
 using StS2AP.Models;
 using StS2AP.Utils;
 using STS2RitsuLib;
@@ -33,12 +32,6 @@ namespace StS2AP
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
 
             LogUtility.Info("Archipelago mod initializing...");
-
-            /// This lets StS know that there's a property on the Death Link Curse that needs to be saved/loaded with the save system.
-            /// This is done by injecting the type into the SavedPropertiesTypeCache.
-            ///
-            /// This also might change when we start using BaseLib. It probably makes this easier.
-            SavedPropertiesTypeCache.InjectTypeIntoCache(typeof(DeathLinkCurse));
 
             // Register with RitsuLib
             var assembly = Assembly.GetExecutingAssembly();
