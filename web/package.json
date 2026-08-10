@@ -1,0 +1,41 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build && vue-tsc -b",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@nuxt/ui": "4.10.0",
+    "@tailwindcss/vite": "4.3.3",
+    "dompurify": "3.4.12",
+    "marked": "18.0.7",
+    "marked-alert": "2.1.2",
+    "tailwindcss": "4.3.3",
+    "vue": "3.5.40",
+    "vue-router": "5.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@iconify-json/glyphs": "1.2.0",
+    "@iconify-json/glyphs-poly": "1.2.0",
+    "@iconify-json/simple-icons": "1.2.92",
+    "@types/node": "24.13.3",
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vue/tsconfig": "0.9.1",
+    "eslint": "10.8.0",
+    "eslint-plugin-vue": "10.10.0",
+    "globals": "17.8.0",
+    "jiti": "2.7.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.0.18",
+    "vite": "8.2.0",
+    "vue-tsc": "3.3.8"
+  }
+}

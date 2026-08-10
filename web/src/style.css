@@ -1,0 +1,172 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+:root {
+  --text: #6b6375;
+  --text-h: #08060d;
+  --border: #e5e4e7;
+  --code-bg: #f4f3ec;
+  --accent: #aa3bff;
+  --accent-bg: rgba(170, 59, 255, 0.1);
+  --accent-border: rgba(170, 59, 255, 0.5);
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --heading: system-ui, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  --ui-border-muted: oklch(56% 0.021 213.5);
+  --ui-border-accented: oklch(72.3% 0.014 214.4);
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light dark;
+  color: var(--text);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Re-Enables cursor-pointer so I don't have to put it everywhere */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+/* Reserve the classic-scrollbar gutter so short and long routes share one layout width. */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Preserve stable layout in older browsers that do not implement scrollbar gutters. */
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+
+  background-image: url("/bg.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+@media (max-width: 1024px) {
+  :root {
+    font-size: 16px;
+  }
+}
+
+a {
+  color: var(--color-amber-500);
+}
+
+/* Alert Styling */
+.markdown-alert {
+  padding: 0.5rem;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid;
+  border-radius: 0.5rem;
+  border-color: color-mix(
+    in oklab,
+    var(--alert-color, var(--ui-success)) 60%,
+    transparent
+  );
+  background-color: color-mix(
+    in oklab,
+    var(--alert-color, var(--ui-success)) 18%,
+    transparent
+  );
+  color: color-mix(in oklab, var(--alert-color, var(--ui-success)) 55%, #fff);
+}
+
+.markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.markdown-alert-title svg {
+  fill: color-mix(in oklab, var(--alert-color, var(--ui-success)) 60%, #fff);
+  flex-shrink: 0;
+}
+
+/* Alert Variant Colors */
+.markdown-alert-tip {
+  --alert-color: var(--ui-success);
+}
+
+.markdown-alert-note {
+  --alert-color: var(--ui-info);
+}
+
+.markdown-alert-important {
+  --alert-color: var(--color-purple-500);
+}
+
+.markdown-alert-warning {
+  --alert-color: var(--ui-warning);
+}
+
+.markdown-alert-caution {
+  --alert-color: var(--ui-error);
+}
+
+/* Markdown Styling */
+.markdown-content {
+  line-height: 1.6;
+}
+
+.markdown-content p {
+  margin: 0 0 1rem;
+}
+
+.markdown-content br {
+  line-height: 1.6;
+}
+
+.markdown-content h1 {
+  @apply font-bold text-lg;
+}
+
+.markdown-content h2 {
+  @apply font-bold text-base;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin: 1rem 0;
+}
+
+.markdown-content p:not(.markdown-alert p) {
+  margin: 0.75rem 0;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
