@@ -1,10 +1,12 @@
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.ControllerInput;
 using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Nodes.Rewards;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
@@ -26,15 +28,83 @@ namespace StS2AP.UI
 {
     public partial class APRewardScreenNode : Control, IOverlayScreen
     {
+        private bool _hotkeysRegistered;
+
         public Button? DefaultFocus { get; set; }
         public NetScreenType ScreenType => NetScreenType.Rewards; 
         public bool UseSharedBackstop => true; 
         public Control? DefaultFocusedControl => DefaultFocus; 
 
-        public void AfterOverlayOpened() { }
-        public void AfterOverlayClosed() { QueueFree(); }
-        public void AfterOverlayShown() { DefaultFocus?.GrabFocus(); }
-        public void AfterOverlayHidden() { }
+        public void AfterOverlayOpened()
+        {
+            ArchipelagoRewardUI.RaiseOverlayAboveMap();
+            RegisterHotkeys();
+        }
+
+        public void AfterOverlayClosed()
+        {
+            UnregisterHotkeys();
+            ArchipelagoRewardUI.RestoreOverlayLayer();
+            QueueFree();
+        }
+
+        public void AfterOverlayShown()
+        {
+            Visible = true;
+
+            // ActiveScreenContext updates after NOverlayStack invokes this callback.
+            // Defer focus so the overlay's recursive focus behavior is enabled first.
+            Callable.From(() => DefaultFocus?.GrabFocus()).CallDeferred();
+        }
+
+        public void AfterOverlayHidden()
+        {
+            // NOverlayStack invokes this before adding a new overlay, so defer the
+            // check until its top entry is final. Stay visible only when the map
+            // caused the callback and this reward screen is still the top overlay.
+            Callable.From(() =>
+            {
+                if (!IsInstanceValid(this))
+                {
+                    return;
+                }
+
+                Visible = ReferenceEquals(NOverlayStack.Instance?.Peek(), this) &&
+                    NMapScreen.Instance?.IsOpen == true;
+            }).CallDeferred();
+        }
+
+        internal void UnregisterHotkeys()
+        {
+            if (!_hotkeysRegistered)
+            {
+                return;
+            }
+
+            var hotkeyManager = NHotkeyManager.Instance;
+            hotkeyManager?.RemoveHotkeyPressedBinding(MegaInput.cancel, ArchipelagoRewardUI.Hide);
+            hotkeyManager?.RemoveHotkeyPressedBinding(MegaInput.pauseAndBack, ArchipelagoRewardUI.Hide);
+            hotkeyManager?.RemoveHotkeyReleasedBinding(MegaInput.viewMap, ArchipelagoRewardUI.HideAndShowMap);
+            hotkeyManager?.RemoveBlockingScreen(this);
+            _hotkeysRegistered = false;
+        }
+
+        private void RegisterHotkeys()
+        {
+            var hotkeyManager = NHotkeyManager.Instance;
+            if (_hotkeysRegistered || hotkeyManager == null)
+            {
+                return;
+            }
+
+            // Block room/map shortcuts below this overlay, then add only the
+            // actions the AP reward screen intentionally supports on top.
+            hotkeyManager.AddBlockingScreen(this);
+            hotkeyManager.PushHotkeyPressedBinding(MegaInput.cancel, ArchipelagoRewardUI.Hide);
+            hotkeyManager.PushHotkeyPressedBinding(MegaInput.pauseAndBack, ArchipelagoRewardUI.Hide);
+            hotkeyManager.PushHotkeyReleasedBinding(MegaInput.viewMap, ArchipelagoRewardUI.HideAndShowMap);
+            _hotkeysRegistered = true;
+        }
     }
         /// <summary>
         /// Data container for a single reward entry displayed in the reward screen.
@@ -104,10 +174,15 @@ namespace StS2AP.UI
         private static VBoxContainer? _itemContainer;
         private static Button? _proceedButton;
         private static Tween? _fadeTween;
+        private static bool _isClosing;
         private static Texture2D? _linkedRewardChainTexture;
         private static bool _linkedRewardChainTextureResolved;
         private static readonly PropertyInfo? ChainImagePathProperty =
             AccessTools.Property(typeof(NLinkedRewardSet), "ChainImagePath");
+        private static int? _originalOverlayZIndex;
+        private static int? _raisedOverlayZIndex;
+        private static NMapScreen? _mouseSuppressedMapScreen;
+        private static Control.MouseBehaviorRecursiveEnum? _originalMapMouseBehavior;
 
         // UI resource paths sourced from rewards_screen.tscn
         private const string PanelPath   = "res://images/ui/reward_screen/reward_panel.png";
@@ -177,6 +252,75 @@ namespace StS2AP.UI
         /// Invoked when the reward screen is closed (all rewards dismissed or skipped)
         /// </summary>
         public static Action? OnScreenClosed;
+
+        /// <summary>
+        /// Raises the game's overlay container above the map while the AP reward
+        /// screen is open. Raising the container also keeps its shared backstop
+        /// above the map, rather than only raising the reward panel itself.
+        /// </summary>
+        internal static void RaiseOverlayAboveMap()
+        {
+            var overlayStack = NOverlayStack.Instance;
+            var mapScreen = NMapScreen.Instance;
+            if (overlayStack == null || mapScreen == null)
+            {
+                return;
+            }
+
+            // make it physically appear above the Map visually
+            _originalOverlayZIndex ??= overlayStack.ZIndex;
+            _raisedOverlayZIndex = Math.Max(overlayStack.ZIndex, mapScreen.ZIndex + 1);
+            overlayStack.ZIndex = _raisedOverlayZIndex.Value;
+
+            SuppressMapMouseInput(mapScreen);
+        }
+
+        /// <summary>
+        /// Prevents the visible map and its child controls from receiving GUI
+        /// mouse events while AP rewards are above it. ActiveScreenContext only
+        /// controls focus; Save the map's behaviour so we can restore it later
+        /// </summary>
+        private static void SuppressMapMouseInput(NMapScreen mapScreen)
+        {
+            if (!mapScreen.IsOpen || _mouseSuppressedMapScreen != null)
+            {
+                return;
+            }
+
+            _mouseSuppressedMapScreen = mapScreen;
+            _originalMapMouseBehavior = mapScreen.MouseBehaviorRecursive;
+            mapScreen.MouseBehaviorRecursive = Control.MouseBehaviorRecursiveEnum.Disabled;
+        }
+
+        /// <summary>
+        /// Restores the overlay container's original draw order after the AP
+        /// reward screen closes, without overwriting a later external change.
+        /// </summary>
+        internal static void RestoreOverlayLayer()
+        {
+            var overlayStack = NOverlayStack.Instance;
+            if (overlayStack != null &&
+                _originalOverlayZIndex.HasValue &&
+                overlayStack.ZIndex == _raisedOverlayZIndex)
+            {
+                overlayStack.ZIndex = _originalOverlayZIndex.Value;
+            }
+
+            _originalOverlayZIndex = null;
+            _raisedOverlayZIndex = null;
+
+            if (GodotObject.IsInstanceValid(_mouseSuppressedMapScreen) &&
+                _originalMapMouseBehavior.HasValue &&
+                _mouseSuppressedMapScreen!.MouseBehaviorRecursive ==
+                    Control.MouseBehaviorRecursiveEnum.Disabled)
+            {
+                _mouseSuppressedMapScreen.MouseBehaviorRecursive =
+                    _originalMapMouseBehavior.Value;
+            }
+
+            _mouseSuppressedMapScreen = null;
+            _originalMapMouseBehavior = null;
+        }
 
 
         /// <summary>
@@ -422,8 +566,10 @@ namespace StS2AP.UI
         {
             LogUtility.Debug("Reward UI Hide() called");
 
-            if (_rootPanel == null || !IsInstanceValid(_rootPanel))
+            if (_isClosing || _rootPanel == null || !IsInstanceValid(_rootPanel))
                 return;
+
+            _isClosing = true;
 
             // Fade out the rewards window, then hide the layer
             if (_rootPanel != null && IsInstanceValid(_rootPanel))
@@ -438,6 +584,7 @@ namespace StS2AP.UI
                     if (_rootPanel != null && IsInstanceValid(_rootPanel))
                         _rootPanel.Modulate = new Color(1f, 1f, 1f, 1f);
                     _rootPanel = null;
+                    _isClosing = false;
                 }));
             }
             else
@@ -449,6 +596,21 @@ namespace StS2AP.UI
         }
 
         /// <summary>
+        /// Closes AP rewards and leaves the player on the map. If the map is
+        /// already open behind the rewards, it is deliberately not toggled off.
+        /// </summary>
+        internal static void HideAndShowMap()
+        {
+            var mapScreen = NMapScreen.Instance;
+            Hide();
+
+            if (mapScreen?.IsOpen == false)
+            {
+                mapScreen.Open(isOpenedFromTopBar: true);
+            }
+        }
+
+        /// <summary>
         /// Removes the reward UI from the scene tree entirely and frees resources
         /// </summary>
         public static void RemoveUI()
@@ -457,6 +619,8 @@ namespace StS2AP.UI
             
             _fadeTween?.Kill();
             _fadeTween = null;
+            (_rootPanel as APRewardScreenNode)?.UnregisterHotkeys();
+            RestoreOverlayLayer();
 
             if (_rootPanel != null && IsInstanceValid(_rootPanel))
                 _rootPanel.QueueFree();
@@ -465,6 +629,7 @@ namespace StS2AP.UI
             _itemContainer    = null;
             _proceedButton    = null;
             _remainingRewards = 0;
+            _isClosing        = false;
         }
 
         #endregion
@@ -557,6 +722,7 @@ namespace StS2AP.UI
                 var root = sceneTree.Root;
 
                 // Full-screen root panel (blocks input to the game while open)
+                _isClosing = false;
                 _rootPanel = new APRewardScreenNode { Name = "APRewardsScreen" };
                 _rootPanel.SetAnchorsPreset(Control.LayoutPreset.FullRect);
                 _rootPanel.MouseFilter = Control.MouseFilterEnum.Stop;
