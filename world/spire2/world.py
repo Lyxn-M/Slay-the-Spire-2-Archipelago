@@ -371,6 +371,12 @@ class SlayTheSpire2World(World):
             "Plating": self.options.plating_filler_weight.value,
             "Friendship": self.options.friendship_filler_weight.value,
             "Post-Combat Card Upgrade": self.options.post_combat_card_upgrade_filler_weight.value,
+            "Post-Combat Card Removal": self.options.post_combat_card_removal_filler_weight.value,
+            "Additional Card Reward": self.options.additional_card_reward_filler_weight.value,
+            "Buffer": self.options.buffer_filler_weight.value,
+            "Vigor": self.options.vigor_filler_weight.value,
+            "Thorns": self.options.thorns_filler_weight.value,
+            "Artifact": self.options.artifact_filler_weight.value,
         }
 
         self.filler_universal_high: list = []
