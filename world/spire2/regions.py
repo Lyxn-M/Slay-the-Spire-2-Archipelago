@@ -74,12 +74,12 @@ def _create_regions(world: 'SlayTheSpire2World', player: int, config: 'Character
                                                       'Rare Card Reward 1',
                                                       # 'Boss Relic 1',
                                                       'Boss Gold 1',
+                                                      "Ancient Act 2",
                                                       * _create_floor_check(17, 17)
                                                   ], ['Early Act 2']))
 
     multiworld.regions.append(world.create_region(player, prefix, 'Early Act 2', config,
                                                   [
-                                                      "Ancient Act 2",
                                                       "Potion Drop 4",
                                                       *_create_floor_check(18, 22),
                                                       "Act 2 Campfire 1",
@@ -115,12 +115,12 @@ def _create_regions(world: 'SlayTheSpire2World', player: int, config: 'Character
                                                       'Rare Card Reward 2',
                                                       # 'Boss Relic 2',
                                                       'Boss Gold 2',
+                                                      "Ancient Act 3",
                                                       *_create_floor_check(33, 33),
                                                   ], ['Early Act 3']))
 
     multiworld.regions.append(world.create_region(player, prefix, 'Early Act 3', config,
                                                   [
-                                                      "Ancient Act 3",
                                                       "Potion Drop 7",
                                                       "Act 3 Campfire 1",
                                                       *_create_floor_check(34, 38),

@@ -199,3 +199,10 @@ class TestProgressiveStartersRequireFloorChecks(Spire2TestBase):
         slot_data = self.world.fill_slot_data()
         self.assertEqual(slot_data["progressive_starter_card"], 0)
         self.assertEqual(slot_data["progressive_starter_relic"], 0)
+
+
+class TestEnsureShopWithNoGoldWorks(Spire2TestBase):
+    options = {
+        "shop_sanity": True,
+        "gold_sanity": False,
+    }
