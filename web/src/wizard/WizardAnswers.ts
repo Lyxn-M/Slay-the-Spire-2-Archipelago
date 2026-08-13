@@ -20,6 +20,7 @@ import {
   PROGRESSION_OPTION_KEYS,
   RUN_OPTION_KEYS,
   SHOP_OPTION_KEYS,
+  STARTING_EQUIPMENT_OPTION_KEYS,
 } from "./WizardOptionKey";
 
 export type CharacterSelectionMode = "all" | "random";
@@ -85,8 +86,15 @@ export interface FillerAnswers {
 }
 
 export interface RunAnswers {
-  relicChoiceCount: number;
+  relicRewardsAvailableAnytime: number;
+  releaseOnVictory: boolean;
   seeded: boolean;
+}
+
+/** Progressive starting card and relic choices presented under Checks & Rewards. */
+export interface StartingEquipmentAnswers {
+  progressiveStarterCard: boolean;
+  progressiveStarterRelic: boolean;
 }
 
 export interface AncientAnswers {
@@ -119,6 +127,7 @@ export interface ShopAnswers {
 }
 
 export interface ChecksAndRewardsAnswers {
+  startingEquipment: StartingEquipmentAnswers;
   ancients: AncientAnswers;
   checks: CheckAnswers;
   shop: ShopAnswers;
@@ -290,23 +299,38 @@ export function createDefaultWizardAnswers(
       individualAscensions,
       selectionMode: "all",
       randomCharacterCount: 1,
-      availability: "all",
+      availability: "random",
       startingCharacter: selectedCharacters[0] ?? null,
       goal: "all",
     },
     run: {
-      relicChoiceCount: getNumberDefault(
+      relicRewardsAvailableAnytime: getNumberDefault(
         catalog,
-        RUN_OPTION_KEYS.relicChoiceCount,
+        RUN_OPTION_KEYS.relicRewardsAvailableAnytime,
+      ),
+      releaseOnVictory: getBooleanDefault(
+        catalog,
+        RUN_OPTION_KEYS.releaseOnVictory,
       ),
       seeded: getBooleanDefault(catalog, RUN_OPTION_KEYS.seeded),
     },
     checksAndRewards: {
+      startingEquipment: {
+        progressiveStarterCard: getBooleanDefault(
+          catalog,
+          STARTING_EQUIPMENT_OPTION_KEYS.progressiveStarterCard,
+        ),
+        progressiveStarterRelic: getBooleanDefault(
+          catalog,
+          STARTING_EQUIPMENT_OPTION_KEYS.progressiveStarterRelic,
+        ),
+      },
       ancients: {
-        relicLocation: getChoiceDefault(catalog, ANCIENT_OPTION_KEYS.relicLocation, [
-          "start_of_act",
-          "anytime",
-        ]),
+        relicLocation: getChoiceDefault(
+          catalog,
+          ANCIENT_OPTION_KEYS.relicLocation,
+          ["start_of_act", "anytime"],
+        ),
         relicPool: getChoiceDefault(catalog, ANCIENT_OPTION_KEYS.relicPool, [
           "balanced",
           "chaos",
@@ -357,10 +381,11 @@ export function createDefaultWizardAnswers(
         catalog,
         PROGRESSION_OPTION_KEYS.progressionBalancing,
       ),
-      accessibility: getChoiceDefault(catalog, PROGRESSION_OPTION_KEYS.accessibility, [
-        "full",
-        "minimal",
-      ]),
+      accessibility: getChoiceDefault(
+        catalog,
+        PROGRESSION_OPTION_KEYS.accessibility,
+        ["full", "minimal"],
+      ),
     },
     deathLink: {
       enabled: getBooleanDefault(catalog, DEATH_LINK_OPTION_KEYS.enabled),

@@ -53,9 +53,9 @@ function getHasConfiguredCharacters(): boolean {
 
 const hasConfiguredCharacters = computed(getHasConfiguredCharacters);
 
-const relicChoiceRange = getGeneratedNumberRange(
+const relicRewardsAvailableAnytimeRange = getGeneratedNumberRange(
   optionCatalog,
-  RUN_OPTION_KEYS.relicChoiceCount,
+  RUN_OPTION_KEYS.relicRewardsAvailableAnytime,
 );
 const progressionBalancingRange = getGeneratedNumberRange(
   optionCatalog,
@@ -307,9 +307,9 @@ function next(): void {
       color="primary"
       variant="pill"
       size="lg"
-      class="mb-6"
+      class="sticky top-(--ui-header-height) z-40 mb-6"
       :ui="{
-        list: 'overflow-x-auto bg-black/45 ring-1 ring-amber-500/20 shadow-lg shadow-black/30',
+        list: 'overflow-x-auto bg-gray-900/90 ring-1 ring-amber-500/20 shadow-lg shadow-black/30',
         trigger: 'cursor-pointer data-[state=active]:font-bold',
       }"
       aria-label="Wizard progress"
@@ -335,7 +335,9 @@ function next(): void {
       <RunSettingsStep
         v-else-if="activeStepId === 'run'"
         v-model="answers.run"
-        :relic-choice-range="relicChoiceRange"
+        :relic-rewards-available-anytime-range="
+          relicRewardsAvailableAnytimeRange
+        "
       />
       <CheckSetupStep
         v-else-if="activeStepId === 'checks'"

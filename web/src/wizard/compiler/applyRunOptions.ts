@@ -3,8 +3,8 @@
  *
  * The Gameplay Modifiers step groups settings that change how an individual climb is offered
  * and rewarded without changing the selected character roster. This compiler owns the
- * Archipelago relic choice count and seeded-run fields. Generic catalog validation
- * still runs after every section.
+ * immediate Relic availability, victory release, and seeded-run fields. Generic
+ * catalog validation still runs after every section.
  */
 
 import type { OptionCatalog } from "../../generated/optionCatalog";
@@ -16,7 +16,7 @@ import type { CompiledOptions } from "./applyCharacterOptions";
  * Applies player-facing Gameplay Modifiers answers to a compiler-owned option object.
  *
  * @param target - Fresh complete option object assembled by the root compiler.
- * @param answers - Player-facing relic, Neow, and seed choices.
+ * @param answers - Player-facing Relic availability, victory, and seed choices.
  * @param catalog - Generated schema used to detect missing owned options.
  * @returns Nothing; replaces only options declared in `RUN_OPTION_KEYS`.
  * @throws When a regenerated catalog no longer contains an owned option.
@@ -34,6 +34,8 @@ export function applyRunOptions(
   }
 
   // Map semantic answers to the canonical generated fields owned by this section.
-  target[RUN_OPTION_KEYS.relicChoiceCount] = answers.relicChoiceCount;
+  target[RUN_OPTION_KEYS.relicRewardsAvailableAnytime] =
+    answers.relicRewardsAvailableAnytime;
+  target[RUN_OPTION_KEYS.releaseOnVictory] = answers.releaseOnVictory;
   target[RUN_OPTION_KEYS.seeded] = answers.seeded;
 }
