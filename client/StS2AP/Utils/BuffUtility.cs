@@ -33,7 +33,7 @@ namespace StS2AP.Utils
     ///                   task as an additional safety net for race conditions.
     ///
     ///  2. On item recv: <see cref="EnqueueBuff"/> is called from
-    ///                   <see cref="ArchipelagoClient.ProcessItem"/> when a buff item
+    ///                   <see cref="Patches_ItemProcessor.ProcessItem"/> when a buff item
     ///                   arrives. The buff is added to <see cref="_buffQueue"/> unless
     ///                   we already know it was consumed (fast path). If storage hasn't
     ///                   loaded yet, it is enqueued anyway and re-checked at apply time.
@@ -221,7 +221,7 @@ namespace StS2AP.Utils
         /// Enqueues a buff item to be applied on the player's next combat turn.
         ///
         /// <para>
-        /// Called from <see cref="ArchipelagoClient.ProcessItem"/> when a buff-type AP item
+        /// Called from <see cref="Patches_itemProcessor.ProcessItem"/> when a buff-type AP item
         /// is received. If the storage load has already completed and we know this index was
         /// previously consumed, the buff is skipped immediately. Otherwise it is enqueued and
         /// the consumed check is deferred to <see cref="ProcessQueuedBuffsAsync"/>, which always
