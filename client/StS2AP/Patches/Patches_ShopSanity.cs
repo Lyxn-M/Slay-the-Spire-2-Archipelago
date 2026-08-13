@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Archipelago.MultiClient.Net.Models;
@@ -11,10 +12,13 @@ using MegaCrit.Sts2.Core.Entities.Gold;
 using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Hooks;
+using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Potions;
 using MegaCrit.Sts2.Core.Nodes.Screens.Shops;
+using MegaCrit.Sts2.Core.Rooms;
 using StS2AP.Data;
 using StS2AP.Extensions;
 using StS2AP.Models;
@@ -312,13 +316,13 @@ namespace StS2AP.Patches
         #region Purchase Interception
 
         /// <summary>Determines whether a merchant entry is one of our AP fakes and if so returns its backing location ID.</summary>
-        private static bool TryGetApLocationId(MerchantEntry entry, out long locationId)
+        internal static bool TryGetApLocationId(MerchantEntry entry, out long locationId)
         {
             locationId = -1;
 
             if (entry is MerchantCardEntry cardEntry)
             {
-                if (cardEntry.CreationResult?.Card is ApItemCardModelBase apCard)
+                if (cardEntry.CreationResult?.originalCard is ApItemCardModelBase apCard)
                 {
                     locationId = apCard.ApLocationId;
                     return true;
@@ -349,6 +353,9 @@ namespace StS2AP.Patches
             return false;
         }
 
+        /// <summary>Convenience wrapper for the shop pages
+        internal static bool IsApSlot(MerchantEntry entry) => TryGetApLocationId(entry, out _);
+
         /// <summary>
         /// Intercepts every card/relic/potion purchase attempt. AP-fake entries
         /// are redirected into DoApPurchase() (sends the location check instead
@@ -365,12 +372,11 @@ namespace StS2AP.Patches
                     return true; // Not an AP slot run vanilla purchase logic untouched.
                 }
 
-                __result = DoApPurchase(__instance, locationId, ignoreCost);
+                __result = DoApPurchase(__instance, inventory, locationId, ignoreCost);
                 return false;
             }
 
-            /// <summary>Charges gold as usual (unless ignored), sends the Archipelago check, and clears the slot instead of restocking it</summary>
-            private static async Task<bool> DoApPurchase(MerchantEntry entry, long locationId, bool ignoreCost)
+            private static async Task<bool> DoApPurchase(MerchantEntry entry, MerchantInventory? inventory, long locationId, bool ignoreCost)
             {
                 if (!entry.IsStocked)
                 {
@@ -400,7 +406,17 @@ namespace StS2AP.Patches
                 GameUtility.SendCheck(locationId);
                 MarkShopSlotChecked(locationId);
 
-                AccessTools.Method(entry.GetType(), "ClearAfterPurchase")?.Invoke(entry, null);
+                bool shouldRefill = player.RunState.CurrentRoom is MerchantRoom
+                    && Hook.ShouldRefillMerchantEntry(player.RunState, entry, player);
+                if (shouldRefill)
+                {
+                    AccessTools.Method(entry.GetType(), "RestockAfterPurchase", new[] { typeof(MerchantInventory) })
+                        ?.Invoke(entry, new object?[] { inventory });
+                }
+                else
+                {
+                    AccessTools.Method(entry.GetType(), "ClearAfterPurchase")?.Invoke(entry, null);
+                }
 
                 await Hook.AfterItemPurchased(player.RunState, player, entry, goldSpent);
                 entry.InvokePurchaseCompleted(entry);
@@ -475,6 +491,36 @@ namespace StS2AP.Patches
             }
         }
 
+        [HarmonyPatch(typeof(RelicModel), "get_Pool")]
+        public static class ApRelicPoolFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(RelicModel __instance, ref RelicPoolModel __result)
+            {
+                if (__instance is not ApItemRelicModel)
+                {
+                    return true;
+                }
+                __result = ModelDb.AllRelicPools.First();
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(PotionModel), "get_Pool")]
+        public static class ApPotionPoolFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(PotionModel __instance, ref PotionPoolModel __result)
+            {
+                if (__instance is not ApItemPotionModel)
+                {
+                    return true;
+                }
+                __result = ModelDb.AllPotionPools.First();
+                return false;
+            }
+        }
+
         /// <summary>Overwrites the potion icon TextureRect with the AP logo whenever an AP potion fake reloads</summary>
         [HarmonyPatch(typeof(NPotion), "Reload")]
         public static class PotionIconOverride
@@ -496,6 +542,10 @@ namespace StS2AP.Patches
             [HarmonyPostfix]
             public static void Postfix(NPotion __instance)
             {
+                if (!__instance.IsNodeReady())
+                {
+                    return;
+                }
                 if (ModelField?.GetValue(__instance) is not ApItemPotionModel)
                 {
                     return;
@@ -512,6 +562,80 @@ namespace StS2AP.Patches
             }
         }
 
+        #region Tooltip Text Fix
+        /// <summary>
+        /// goober stuff to bypass base game limits :p
+        /// </summary>
+        [HarmonyPatch(typeof(RelicModel), "get_Description")]
+        public static class ApRelicDescriptionFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(RelicModel __instance, ref LocString __result)
+            {
+                if (__instance is not ApItemRelicModel apRelic)
+                {
+                    return true;
+                }
+                __result = BuildApLocString("relics", $"{__instance.Id.Entry}.description", apRelic.ApItemName, apRelic.ApPlayerName, apRelic.ApClassification);
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(PotionModel), "get_Title")]
+        public static class ApPotionTitleFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(PotionModel __instance, ref LocString __result)
+            {
+                if (__instance is not ApItemPotionModel apPotion)
+                {
+                    return true;
+                }
+                __result = BuildApLocString("potions", $"{__instance.Id.Entry}.title", apPotion.ApItemName, apPotion.ApPlayerName, apPotion.ApClassification);
+                return false;
+            }
+        }
+
+        [HarmonyPatch(typeof(PotionModel), "get_Description")]
+        public static class ApPotionDescriptionFix
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(PotionModel __instance, ref LocString __result)
+            {
+                if (__instance is not ApItemPotionModel apPotion)
+                {
+                    return true;
+                }
+                __result = BuildApLocString("potions", $"{__instance.Id.Entry}.description", apPotion.ApItemName, apPotion.ApPlayerName, apPotion.ApClassification);
+                return false;
+            }
+        }
+
+        /// <summary>Short label ("Prog.", "Useful", "Filler", "Trap"), matching the private
+        /// ClassificationLabel switch already duplicated in ApItemRelicModel/ApItemPotionModel.</summary>
+        private static string ClassificationLabel(ApItemClassification classification) => classification switch
+        {
+            ApItemClassification.Progression => "Prog.",
+            ApItemClassification.Useful => "Useful",
+            ApItemClassification.Trap => "Trap",
+            _ => "Filler",
+        };
+
+        /// <summary>
+        /// Builds a LocString against a real game loc table (e.g. "relics"/"potions"),
+        /// populated with the same item_name/player_name/classification tokens
+        /// ApItemRelicModel/ApItemPotionModel's ExtraHoverTips already use
+        /// </summary>
+        private static LocString BuildApLocString(string table, string key, string itemName, string playerName, ApItemClassification classification)
+        {
+            var locString = new LocString(table, key);
+            locString.Add("item_name", itemName);
+            locString.Add("player_name", playerName);
+            locString.Add("classification", ClassificationLabel(classification));
+            return locString;
+        }
+
         #endregion
     }
+    #endregion
 }

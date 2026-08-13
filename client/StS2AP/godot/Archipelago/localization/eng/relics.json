@@ -1,0 +1,6 @@
+{
+  "shop_relic_title": "{item_name} ({classification})",
+  "shop_relic_description": "({classification}) {item_name} for {player_name}.",
+  "AP_ITEM_RELIC_MODEL.title": "Archipelago Check",
+  "AP_ITEM_RELIC_MODEL.description": "It is a check whatcha expecting"
+}
