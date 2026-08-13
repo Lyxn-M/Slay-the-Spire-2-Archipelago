@@ -192,9 +192,9 @@ namespace StS2AP.UI
         private static bool _linkedRewardChainTextureResolved;
         private static readonly PropertyInfo? ChainImagePathProperty =
             AccessTools.Property(typeof(NLinkedRewardSet), "ChainImagePath");
-        
+
         private static ReturnDestination _returnDestination;
-        
+
         // used to differentiate card rewards from AP rewards versus a natural card reward
         // because they are treated differently due to skips not actually skipping AP stuff
         private static NCardRewardSelectionScreen? _ownedCardPicker;
@@ -270,7 +270,7 @@ namespace StS2AP.UI
         public static Action? OnScreenClosed;
 
         /// <summary>
-        /// Whether the UI is open or not. 
+        /// Whether the UI is open or not.
         /// Note: This is different from IsVisible, which can be false if the UI is hidden temporarily by another overlay.
         /// </summary>
         public static bool IsOpen => _rootPanel != null && IsInstanceValid(_rootPanel) && _rootPanel.IsInsideTree();
@@ -367,10 +367,20 @@ namespace StS2AP.UI
             var currentPlayer = GameUtility.CurrentPlayer;
             if (currentPlayer == null) return;
 
+            // Normally this happens on receipt or checkpoint load. Retrying here keeps an
+            // unexpected assignment failure recoverable without another tracking state.
+            RelicRewardUtility.ReconcileBankedRewards(currentPlayer);
 
             // Get Unused items from the Multiworld for our current character
             var availableItems = ArchipelagoClient.Progress.AllReceivedItems
-                                .Where(i => !ArchipelagoClient.Progress.UsedItems.Contains(i.Index) && i.Item.GetCharacterOffset() == GameUtility.CurrentCharacterID);
+                .Where(i =>
+                    !ArchipelagoClient.Progress.UsedItems.Contains(i.Index)
+                    && i.Item.GetCharacterOffset() == GameUtility.CurrentCharacterID
+                )
+                .Where(i =>
+                    i.Item.GetCharacterSpecificItemID() != APItem.Relic
+                    || RelicRewardUtility.IsAvailableInRewardMenu(i, currentPlayer)
+                );
             
             // Prepare them for the UI
             var rewardDataList = availableItems.Where(i => i.Item.GetCharacterSpecificItemID().CanBePickedUp()).Select(i =>
@@ -391,12 +401,18 @@ namespace StS2AP.UI
                 var rawId = i.Item.GetCharacterSpecificItemID();
                 if (rawId == APItem.Relic)
                 {
-                    var choiceCount = ArchipelagoClient.Settings?.RelicChoiceCount ?? 1;
-                    var choices = ArchipelagoClient.Progress.GetOrAssignRelicChoices(i.Index, currentPlayer, choiceCount);
+                    // AP-menu Relics are deliberately one persisted choice. Normal-screen relics
+                    // stay native and never enter this assignment map.
+                    var choices = ArchipelagoClient.Progress.GetOrAssignRelicChoices(
+                        i.Index,
+                        currentPlayer,
+                        choiceCount: 1
+                    );
                     if (choices.Count > 0)
                     {
                         data.ItemName = "Choose a Relic";
                         data.LinkedRelicChoices = choices;
+                        data.OnClaimed = () => RelicRewardUtility.CompleteMenuClaim(i.Index);
                     }
                     else
                     {
@@ -454,7 +470,7 @@ namespace StS2AP.UI
                 return data;
             }).ToList();
 
-            rewardDataList.ForEach(item => item.OnClaimed = () =>
+            rewardDataList.ForEach(item => item.OnClaimed ??= () =>
             {
                 // Mark the item as used in the Multiworld so it doesn't show up again if we reopen the screen
                 ArchipelagoClient.Progress.UsedItems.Add(item.Index);
@@ -1021,6 +1037,7 @@ namespace StS2AP.UI
             if (choices == null || choices.Count == 0)
                 return CreateRewardButton(data);
 
+            var owningPanel = _rootPanel;
             var chainTexture = GetLinkedRewardChainTexture();
             var group = new Control
             {
@@ -1055,7 +1072,10 @@ namespace StS2AP.UI
                         if (granted)
                             data.OnClaimed?.Invoke();
 
-                        if (!GodotObject.IsInstanceValid(group))
+                        if (!GodotObject.IsInstanceValid(group) ||
+                            owningPanel == null ||
+                            !GodotObject.IsInstanceValid(owningPanel) ||
+                            !ReferenceEquals(_rootPanel, owningPanel))
                             return;
 
                         if (!granted)
@@ -1317,7 +1337,7 @@ namespace StS2AP.UI
                                 // Reward consumption is authoritative even if this particular
                                 // menu instance was closed or rebuilt while the picker was open.
                                 data.OnClaimed?.Invoke();
-                                
+
                                 if (!GodotObject.IsInstanceValid(btn) ||
                                     owningPanel == null ||
                                     !GodotObject.IsInstanceValid(owningPanel) ||

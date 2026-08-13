@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using Newtonsoft.Json.Linq;
 using StS2AP.Data;
+using StS2AP.Extensions;
 using StS2AP.Models;
 using StS2AP.UI;
 using StS2AP.Utils;
@@ -136,6 +137,8 @@ namespace StS2AP
         private static int _rewardCountReceivedItems = -1;
         private static int _rewardCountUsedItems = -1;
         private static int _rewardCountGoldRemaining = int.MinValue;
+        private static int _rewardCountRelicChoiceAssignments = -1;
+        private static int _rewardCountRelicsAvailableAnytime = -1;
         private static int _cachedAvailableRewardCount;
 
         /// <summary>
@@ -167,12 +170,16 @@ namespace StS2AP
                 int receivedItems = Progress.AllReceivedItems.Count;
                 int usedItems = Progress.UsedItems.Count;
                 int goldRemaining = Progress.GoldRemaining;
+                int relicChoiceAssignments = Progress.RelicChoiceAssignments.Count;
+                int relicsAvailableAnytime = Progress.RelicRewardsAvailableAnytimeForRun;
 
                 if (ReferenceEquals(_rewardCountProgress, Progress) &&
                     _rewardCountCharacterOffset == characterOffset &&
                     _rewardCountReceivedItems == receivedItems &&
                     _rewardCountUsedItems == usedItems &&
-                    _rewardCountGoldRemaining == goldRemaining)
+                    _rewardCountGoldRemaining == goldRemaining &&
+                    _rewardCountRelicChoiceAssignments == relicChoiceAssignments &&
+                    _rewardCountRelicsAvailableAnytime == relicsAvailableAnytime)
                 {
                     return _cachedAvailableRewardCount;
                 }
@@ -186,6 +193,8 @@ namespace StS2AP
                 _rewardCountReceivedItems = receivedItems;
                 _rewardCountUsedItems = usedItems;
                 _rewardCountGoldRemaining = goldRemaining;
+                _rewardCountRelicChoiceAssignments = relicChoiceAssignments;
+                _rewardCountRelicsAvailableAnytime = relicsAvailableAnytime;
                 _cachedAvailableRewardCount = count;
                 return _cachedAvailableRewardCount;
             }
@@ -773,7 +782,11 @@ namespace StS2AP
         /// </summary>
         /// <param name="item">Received Item</param>
         /// <param name="index">The index of the item in the Archipelago Multiworld</param>
-        private static void ProcessItem(ItemInfo item, int index)
+        /// <param name="liveDelivery">
+        /// Whether to run live-only side effects. Save replay records receipts first and
+        /// reconciles them once after the saved run state has been restored.
+        /// </param>
+        private static void ProcessItem(ItemInfo item, int index, bool liveDelivery = true)
         {
             // Log the item
             LogUtility.Success(
@@ -924,6 +937,40 @@ namespace StS2AP
 
                         break;
                     }
+                case APItem.Relic:
+                {
+                    // Save loading replays the whole item list, then reconciles once at the end.
+                    if (!liveDelivery)
+                    {
+                        Progress.AllReceivedItems.Add(new IndexedItemInfo(item, index));
+                        return;
+                    }
+
+                    // Receipt storage, RelicFactory, and the AP reward UI share run state, so keep
+                    // the whole live-delivery path on Godot's main thread.
+                    Callable.From(() =>
+                    {
+                        // Keep every receipt. Other characters and out-of-run deliveries may
+                        // matter when their run starts or a checkpoint is loaded.
+                        Progress.AllReceivedItems.Add(new IndexedItemInfo(item, index));
+
+                        var player = GameUtility.CurrentPlayer;
+                        var characterOffset = player?.Character.GetCharacterOffset();
+                        if (player == null
+                            || !characterOffset.HasValue
+                            || item.GetCharacterOffset() != characterOffset.Value)
+                        {
+                            return;
+                        }
+
+                        // A receipt arriving after its Elite/chest reward belongs in the AP menu.
+                        // Reconcile all pairs so checkpoint loads do not depend on callback order.
+                        RelicRewardUtility.ReconcileBankedRewards(player);
+                        if (ArchipelagoRewardUI.IsOpen)
+                            ArchipelagoRewardUI.ShowRewards();
+                    }).CallDeferred();
+                    return;
+                }
                 case APItem.SwarmingElites:
                 case APItem.WearyTraveler:
                 case APItem.Poverty:
@@ -1037,7 +1084,7 @@ namespace StS2AP
                 ItemInfo info = ArchipelagoClient.Session.Items.AllItemsReceived[i];
 
                 // i+1 because the index from multiclient .net is essentially 1 based, not 0
-                ProcessItem(info, i + 1);
+                ProcessItem(info, i + 1, liveDelivery: false);
             }
         }
 
@@ -1124,7 +1171,10 @@ namespace StS2AP
 
             settings.AncientRelicLocation = (AncientRelicLocation)Convert.ToInt32(slotData["ancient_relic_location"]);
             settings.AncientRelicPool = (AncientRelicPoolMode)Convert.ToInt32(slotData["ancient_relic_pool"]);
-            settings.RelicChoiceCount = Convert.ToInt32(slotData["relic_choice_count"]);
+            // These keys are one APWorld/client contract. Missing values should reject the slot
+            // instead of silently changing the run's reward rules.
+            settings.RelicRewardsAvailableAnytime = Convert.ToInt32(slotData["relic_rewards_available_anytime"]);
+            settings.ReleaseOnVictory = Convert.ToBoolean(slotData["release_on_victory"]);
 
             if (slotData.ContainsKey("campfire_sanity"))
                 settings.CampfireSanity = Convert.ToInt32(slotData["campfire_sanity"]) != 0;
