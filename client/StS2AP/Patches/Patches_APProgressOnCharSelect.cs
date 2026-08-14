@@ -92,6 +92,12 @@ namespace StS2AP.Patches
 
                 // Update Goal State
                 ArchipelagoCharTrackerUI.ClearedCheck?.SetText(character.HasCleared() ? "[green][sine]✓[/sine][/green]" : "[red]—[/red]");
+
+                if (ArchipelagoClient.Settings.ShopSanity)
+                {
+                    var shopLocations = LocationData.GetShopsanityLocations(character);
+                    SetCheckedLocation(ArchipelagoCharTrackerUI.ShopsanityChecks, shopLocations, ArchipelagoProgress._maxShopChecks);
+                }
             }
 
             /// <summary>
@@ -193,6 +199,29 @@ namespace StS2AP.Patches
                 else
                 {
                     ArchipelagoCharTrackerUI.PotionRewards?.SetText("0");
+                }
+
+                // Update Shopsanity Item Unlocks (only tracked/shown when Shopsanity is enabled)
+                if (ArchipelagoClient.Settings.ShopSanity)
+                {
+                    int shopCardSlots = ArchipelagoClient.Progress.ShopCardSlotsReceived.TryGetValue(offset, out int cs) ? cs : 0;
+                    ArchipelagoCharTrackerUI.ShopCardSlots?.SetText(
+                        $"({Math.Min(shopCardSlots, ArchipelagoProgress._maxShopCardSlots)} / {ArchipelagoProgress._maxShopCardSlots})");
+
+                    int shopNeutralSlots = ArchipelagoClient.Progress.ShopNeutralSlotsReceived.TryGetValue(offset, out int ns) ? ns : 0;
+                    ArchipelagoCharTrackerUI.ShopNeutralSlots?.SetText(
+                        $"({Math.Min(shopNeutralSlots, ArchipelagoProgress._maxShopNeutralSlots)} / {ArchipelagoProgress._maxShopNeutralSlots})");
+
+                    int shopRelicSlots = ArchipelagoClient.Progress.ShopRelicSlotsReceived.TryGetValue(offset, out int rs) ? rs : 0;
+                    ArchipelagoCharTrackerUI.ShopRelicSlots?.SetText(
+                        $"({Math.Min(shopRelicSlots, ArchipelagoProgress._maxShopRelicSlots)} / {ArchipelagoProgress._maxShopRelicSlots})");
+
+                    int shopPotionSlots = ArchipelagoClient.Progress.ShopPotionSlotsReceived.TryGetValue(offset, out int ps) ? ps : 0;
+                    ArchipelagoCharTrackerUI.ShopPotionSlots?.SetText(
+                        $"({Math.Min(shopPotionSlots, ArchipelagoProgress._maxShopPotionSlots)} / {ArchipelagoProgress._maxShopPotionSlots})");
+
+                    ArchipelagoCharTrackerUI.ShopRemoves?.SetText(
+                        $"({ArchipelagoClient.Progress.MaxShopRemoveLevel(offset) ?? 0} / {ArchipelagoProgress._maxShopRemoves})");
                 }
             }
         }

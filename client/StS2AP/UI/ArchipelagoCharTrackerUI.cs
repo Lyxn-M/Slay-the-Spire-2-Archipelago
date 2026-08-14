@@ -83,6 +83,9 @@ namespace StS2AP.UI
         /// <summary>Tracks whether the "Slayed the Spire" check has been earned.</summary>
         public static ItemCountLabel? ClearedCheck { get; private set; }
 
+        /// <summary>Tracks how many Shopsanity AP Checks have been found.</summary>
+        public static ItemCountLabel? ShopsanityChecks { get; private set; }
+
         #endregion
 
         #region AP Item Labels
@@ -110,6 +113,21 @@ namespace StS2AP.UI
 
         /// <summary>Tracks the number of Progressive Smith rewards received.</summary>
         public static ItemCountLabel? ProgressiveSmithLabel { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Card slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopCardSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Neutral/Colorless card slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopNeutralSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Relic slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopRelicSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Potion slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopPotionSlots { get; private set; }
+
+        /// <summary>Tracks the Progressive Shop Card Removal level received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopRemoves { get; private set; }
 
         #endregion
 
@@ -243,6 +261,12 @@ namespace StS2AP.UI
                 GoldRewards          = null;
                 ProgressiveRestLabel = null;
                 ProgressiveSmithLabel = null;
+                ShopsanityChecks = null;
+                ShopCardSlots        = null;
+                ShopNeutralSlots     = null;
+                ShopRelicSlots       = null;
+                ShopPotionSlots      = null;
+                ShopRemoves          = null;
             }
         }
 
@@ -499,6 +523,13 @@ namespace StS2AP.UI
                 AddCheckRow(CampfiresanityChecks);
             }
 
+            // Shopsanity Checks Counter (placed before Press Start and Slayed the Spire)
+            if (ArchipelagoClient.Settings.ShopSanity)
+            {
+                ShopsanityChecks = new ItemCountLabel("res://images/ui/run_history/shop.png", "(0 / 16)", "AP_REWARD_SHOPSANITY_CHECKS");
+                AddCheckRow(ShopsanityChecks);
+            }
+
             // Press Start Counter
             PressStartCheck = new ItemCountLabel("res://images/ui/run_history/neow.png", "—", "AP_REWARD_PRESS_START_CHECK");
             AddCheckRow(PressStartCheck);
@@ -540,6 +571,29 @@ namespace StS2AP.UI
             // Progressive Smith Total
             ProgressiveSmithLabel = new ItemCountLabel("res://images/relics/whetstone.png", "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
             AddItemRow(ProgressiveSmithLabel);
+
+            if (ArchipelagoClient.Settings.ShopSanity)
+            {
+                // Shop Card Slots Unlocked
+                ShopCardSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_card_back.png", "(0 / 5)", "AP_REWARD_SHOP_CARD_SLOTS");
+                AddItemRow(ShopCardSlots);
+
+                // Shop Neutral/Colorless Slots Unlocked
+                ShopNeutralSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_common_card_reward.png", "(0 / 2)", "AP_REWARD_SHOP_NEUTRAL_SLOTS");
+                AddItemRow(ShopNeutralSlots);
+
+                // Shop Relic Slots Unlocked
+                ShopRelicSlots = new ItemCountLabel("res://images/relics/the_courier.png", "(0 / 3)", "AP_REWARD_SHOP_RELIC_SLOTS");
+                AddItemRow(ShopRelicSlots);
+
+                // Shop Potion Slots Unlocked
+                ShopPotionSlots = new ItemCountLabel("res://images/potions/foul_potion.png", "(0 / 3)", "AP_REWARD_SHOP_POTION_SLOTS");
+                AddItemRow(ShopPotionSlots);
+
+                // Progressive Shop Card Removal
+                ShopRemoves = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_card_removal.png", "(0 / 3)", "AP_REWARD_SHOP_REMOVES");
+                AddItemRow(ShopRemoves);
+            }
 
             // Set initial values based on the first character from the select screen
             UpdateCharTrackerUI.UpdateCheckedLocations(character);

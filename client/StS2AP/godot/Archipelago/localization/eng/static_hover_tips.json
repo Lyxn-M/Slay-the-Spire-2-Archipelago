@@ -36,5 +36,17 @@
   "AP_REWARD_PROGRESSIVE_REST.title": "Progressive Rests",
   "AP_REWARD_PROGRESSIVE_REST.description": "The number of Progressive Rest rewards received for this character. The number of these represents the highest Act you can Heal at.",
   "AP_REWARD_PROGRESSIVE_SMITH.title": "Progressive Smiths",
-  "AP_REWARD_PROGRESSIVE_SMITH.description": "The number of Progressive Smith rewards received for this character. The number of these represents the highest Act you can Upgrade at."
+  "AP_REWARD_PROGRESSIVE_SMITH.description": "The number of Progressive Smith rewards received for this character. The number of these represents the highest Act you can Upgrade at.",
+  "AP_REWARD_SHOP_CARD_SLOTS.title": "Shop Card Slots",
+  "AP_REWARD_SHOP_CARD_SLOTS.description": "The number of Shop Card Slots received for this character. You can find those at the merchant.",
+  "AP_REWARD_SHOP_NEUTRAL_SLOTS.title": "Shop Neutral Card Slots",
+  "AP_REWARD_SHOP_NEUTRAL_SLOTS.description": "The number of Shop Neutral Card Slots received for this character. You can find those at the merchant.",
+  "AP_REWARD_SHOP_RELIC_SLOTS.title": "Shop Relic Slots",
+  "AP_REWARD_SHOP_RELIC_SLOTS.description": "The number of Shop Relic Slots received for this character. You can find those at the merchant.",
+  "AP_REWARD_SHOP_POTION_SLOTS.title": "Shop Potion Slots",
+  "AP_REWARD_SHOP_POTION_SLOTS.description": "The number of Shop Potion Slots received for this character. You can find those at the merchant.",
+  "AP_REWARD_SHOP_REMOVES.title": "Progressive Shop Card Removal",
+  "AP_REWARD_SHOP_REMOVES.description": "The number of Progressive Shop Card Removals received for this character. You can find those at the merchant.",
+  "AP_REWARD_SHOPSANITY_CHECKS.title": "ShopSanity Checks",
+  "AP_REWARD_SHOPSANITY_CHECKS.description": "The number of AP checks found at the shop"
 }
