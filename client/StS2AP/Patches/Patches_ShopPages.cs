@@ -27,17 +27,16 @@ namespace StS2AP.Patches
         private static readonly FieldInfo? HidePosField =
             AccessTools.Field(typeof(NBackButton), "_hidePos");
 
-        private static readonly MethodInfo? OnEnableMethod =
-            AccessTools.Method(typeof(NBackButton), "OnEnable");
-
-        private static readonly MethodInfo? OnDisableMethod =
-            AccessTools.Method(typeof(NBackButton), "OnDisable");
-
         private static readonly FieldInfo? MoveTweenField =
             AccessTools.Field(typeof(NBackButton), "_moveTween");
 
+        private static readonly MethodInfo? CloseInventoryMethod =
+            AccessTools.Method(typeof(NMerchantInventory), "Close");
+
         private static Control? _toApPageButton;
         private static Control? _toVanillaButton;
+        private static bool _isCoordinatingClose;
+        private static int _navigationBlockDepth;
 
         #region Page Spawning
 
@@ -148,6 +147,7 @@ namespace StS2AP.Patches
                     return;
                 }
                 apPage.Position = vanillaPage.Position + new Vector2(vanillaPage.Size.X, 0f);
+                ShopPageUtility.RecordHomePositions();
             }
 
             /// <summary>
@@ -352,32 +352,107 @@ namespace StS2AP.Patches
                 return;
             }
 
+            if (_navigationBlockDepth > 0)
+            {
+                DisableAndHideNavButton(_toApPageButton);
+                DisableAndHideNavButton(_toVanillaButton);
+                return;
+            }
+
+            NMerchantInventory? vanillaPage = ShopPageUtility.VanillaPageInstance;
+            NMerchantInventory? apPage = ShopPageUtility.ApPageInstance;
+            if (vanillaPage == null
+                || apPage == null
+                || !GodotObject.IsInstanceValid(vanillaPage)
+                || !GodotObject.IsInstanceValid(apPage)
+                || !vanillaPage.IsOpen
+                || !apPage.IsOpen)
+            {
+                DisableAndHideNavButton(_toApPageButton);
+                DisableAndHideNavButton(_toVanillaButton);
+                return;
+            }
+
             bool isApPageFront = ShopPageUtility.IsApPageFront;
             Control? buttonToEnable = isApPageFront ? _toVanillaButton : _toApPageButton;
             Control? buttonToDisable = isApPageFront ? _toApPageButton : _toVanillaButton;
 
             if (buttonToEnable != null && GodotObject.IsInstanceValid(buttonToEnable))
             {
-                buttonToEnable.Visible = true;
-
-                if (buttonToEnable is NBackButton realEnable)
-                {
-                    OnEnableMethod?.Invoke(realEnable, null);
-                }
-
+                EnableNavButton(buttonToEnable);
                 buttonToEnable.GetParent()?.MoveChild(buttonToEnable, -1);
             }
 
-            if (buttonToDisable != null && GodotObject.IsInstanceValid(buttonToDisable))
-            {
-                if (buttonToDisable is NBackButton realDisable)
-                {
-                    OnDisableMethod?.Invoke(realDisable, null);
-                }
+            DisableAndHideNavButton(buttonToDisable);
+        }
 
-                // Force Visible off rather than trust OnDisable's hide tween to get there.
-                buttonToDisable.Visible = false;
+        internal static void BeginNavigationBlock()
+        {
+            _navigationBlockDepth++;
+            DisableAndHideNavButton(_toApPageButton);
+            DisableAndHideNavButton(_toVanillaButton);
+        }
+
+        internal static void EndNavigationBlock()
+        {
+            if (_navigationBlockDepth > 0)
+            {
+                _navigationBlockDepth--;
             }
+
+            if (_navigationBlockDepth > 0)
+            {
+                return;
+            }
+
+            NMerchantInventory? vanillaPage = ShopPageUtility.VanillaPageInstance;
+            NMerchantInventory? apPage = ShopPageUtility.ApPageInstance;
+            if (vanillaPage != null
+                && apPage != null
+                && GodotObject.IsInstanceValid(vanillaPage)
+                && GodotObject.IsInstanceValid(apPage)
+                && vanillaPage.IsOpen
+                && !apPage.IsOpen)
+            {
+                apPage.Open();
+            }
+
+            SyncNavButtonsToFrontPage();
+        }
+
+        private static void EnableNavButton(Control button)
+        {
+            button.Visible = true;
+            button.MouseFilter = Control.MouseFilterEnum.Stop;
+
+            if (button is NBackButton realButton)
+            {
+                realButton.Enable();
+            }
+            else if (button is Button fallbackButton)
+            {
+                fallbackButton.Disabled = false;
+            }
+        }
+
+        private static void DisableAndHideNavButton(Control? button)
+        {
+            if (button == null || !GodotObject.IsInstanceValid(button))
+            {
+                return;
+            }
+
+            if (button is NBackButton realButton)
+            {
+                realButton.Disable();
+            }
+            else if (button is Button fallbackButton)
+            {
+                fallbackButton.Disabled = true;
+            }
+
+            button.MouseFilter = Control.MouseFilterEnum.Ignore;
+            button.Visible = false;
         }
 
         /// <summary>
@@ -394,39 +469,64 @@ namespace StS2AP.Patches
         }
 
         /// <summary>
-        /// Close() only affects the two NMerchantInventory pages, not our nav buttons on
-        /// commonParent, so hide them here explicitly. Close() is private, patched by
-        /// name.
+        /// Treats the two inventory nodes as one screen. Closing either page closes its
+        /// still-open peer, then restores the canonical vanilla-front positions.
         /// </summary>
         [HarmonyPatch(typeof(NMerchantInventory), "Close")]
-        public static class HideNavButtonsOnClose
+        public static class CoordinatePageClose
         {
             [HarmonyPostfix]
-            public static void Postfix()
+            public static void Postfix(NMerchantInventory __instance)
             {
-                KillMoveTween(_toApPageButton);
-                KillMoveTween(_toVanillaButton);
-
-                HideButton(_toApPageButton);
-                HideButton(_toVanillaButton);
-            }
-
-            private static void KillMoveTween(Control? button)
-            {
-                if (button is NBackButton backButton
-                    && GodotObject.IsInstanceValid(backButton)
-                    && MoveTweenField?.GetValue(backButton) is Tween tween)
+                if (_isCoordinatingClose || !TryGetPeerPage(__instance, out NMerchantInventory? peerPage))
                 {
-                    tween.Kill();
+                    return;
+                }
+
+                _isCoordinatingClose = true;
+                try
+                {
+                    if (peerPage != null && GodotObject.IsInstanceValid(peerPage) && peerPage.IsOpen)
+                    {
+                        if (CloseInventoryMethod == null)
+                        {
+                            LogUtility.Error("ShopPages: couldn't resolve NMerchantInventory.Close, so the peer page could not be closed.");
+                        }
+                        else
+                        {
+                            CloseInventoryMethod.Invoke(peerPage, null);
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    LogUtility.Error($"ShopPages: failed to close the peer inventory page. {ex}");
+                }
+                finally
+                {
+                    DisableAndHideNavButton(_toApPageButton);
+                    DisableAndHideNavButton(_toVanillaButton);
+                    ShopPageUtility.ResetToVanillaPage();
+                    _isCoordinatingClose = false;
                 }
             }
 
-            private static void HideButton(Control? button)
+            private static bool TryGetPeerPage(NMerchantInventory instance, out NMerchantInventory? peerPage)
             {
-                if (button != null && GodotObject.IsInstanceValid(button))
+                if (ReferenceEquals(instance, ShopPageUtility.VanillaPageInstance))
                 {
-                    button.Visible = false;
+                    peerPage = ShopPageUtility.ApPageInstance;
+                    return true;
                 }
+
+                if (ReferenceEquals(instance, ShopPageUtility.ApPageInstance))
+                {
+                    peerPage = ShopPageUtility.VanillaPageInstance;
+                    return true;
+                }
+
+                peerPage = null;
+                return false;
             }
         }
 

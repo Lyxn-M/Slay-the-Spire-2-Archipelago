@@ -96,7 +96,7 @@ namespace StS2AP.Patches
                 if (ArchipelagoClient.Settings.ShopSanity)
                 {
                     var shopLocations = LocationData.GetShopsanityLocations(character);
-                    SetCheckedLocation(ArchipelagoCharTrackerUI.ShopsanityChecks, shopLocations, ArchipelagoProgress._maxShopChecks);
+                    SetCheckedLocation(ArchipelagoCharTrackerUI.ShopsanityChecks, shopLocations, shopLocations.Count);
                 }
             }
 
@@ -212,22 +212,26 @@ namespace StS2AP.Patches
                 {
                     int shopCardSlots = ArchipelagoClient.Progress.ShopCardSlotsReceived.TryGetValue(offset, out int cs) ? cs : 0;
                     ArchipelagoCharTrackerUI.ShopCardSlots?.SetText(
-                        $"({Math.Min(shopCardSlots, ArchipelagoProgress._maxShopCardSlots)} / {ArchipelagoProgress._maxShopCardSlots})");
+                        $"({Math.Min(shopCardSlots, ArchipelagoClient.Settings.ShopCardSlots)} / {ArchipelagoClient.Settings.ShopCardSlots})");
 
                     int shopNeutralSlots = ArchipelagoClient.Progress.ShopNeutralSlotsReceived.TryGetValue(offset, out int ns) ? ns : 0;
                     ArchipelagoCharTrackerUI.ShopNeutralSlots?.SetText(
-                        $"({Math.Min(shopNeutralSlots, ArchipelagoProgress._maxShopNeutralSlots)} / {ArchipelagoProgress._maxShopNeutralSlots})");
+                        $"({Math.Min(shopNeutralSlots, ArchipelagoClient.Settings.ShopNeutralSlots)} / {ArchipelagoClient.Settings.ShopNeutralSlots})");
 
                     int shopRelicSlots = ArchipelagoClient.Progress.ShopRelicSlotsReceived.TryGetValue(offset, out int rs) ? rs : 0;
                     ArchipelagoCharTrackerUI.ShopRelicSlots?.SetText(
-                        $"({Math.Min(shopRelicSlots, ArchipelagoProgress._maxShopRelicSlots)} / {ArchipelagoProgress._maxShopRelicSlots})");
+                        $"({Math.Min(shopRelicSlots, ArchipelagoClient.Settings.ShopRelicSlots)} / {ArchipelagoClient.Settings.ShopRelicSlots})");
 
                     int shopPotionSlots = ArchipelagoClient.Progress.ShopPotionSlotsReceived.TryGetValue(offset, out int ps) ? ps : 0;
                     ArchipelagoCharTrackerUI.ShopPotionSlots?.SetText(
-                        $"({Math.Min(shopPotionSlots, ArchipelagoProgress._maxShopPotionSlots)} / {ArchipelagoProgress._maxShopPotionSlots})");
+                        $"({Math.Min(shopPotionSlots, ArchipelagoClient.Settings.ShopPotionSlots)} / {ArchipelagoClient.Settings.ShopPotionSlots})");
 
-                    ArchipelagoCharTrackerUI.ShopRemoves?.SetText(
-                        $"({ArchipelagoClient.Progress.MaxShopRemoveLevel(offset) ?? 0} / {ArchipelagoProgress._maxShopRemoves})");
+                    if (ArchipelagoClient.Settings.ShopRemoveSlots)
+                    {
+                        int shopRemoveLevel = ArchipelagoClient.Progress.MaxShopRemoveLevel(offset) ?? 0;
+                        ArchipelagoCharTrackerUI.ShopRemoves?.SetText(
+                            $"({Math.Min(shopRemoveLevel, ArchipelagoProgress._maxShopRemoves)} / {ArchipelagoProgress._maxShopRemoves})");
+                    }
                 }
             }
         }

@@ -53,34 +53,9 @@ namespace StS2AP.Models
         public const int _maxBossRewards = 3;
 
         /// <summary>
-        /// The maximum number of Shopsanity Card slot unlocks a player could receive.
-        /// </summary>
-        public const int _maxShopCardSlots = 5;
-
-        /// <summary>
-        /// The maximum number of Shopsanity Neutral/Colorless card slot unlocks a player could receive.
-        /// </summary>
-        public const int _maxShopNeutralSlots = 2;
-
-        /// <summary>
-        /// The maximum number of Shopsanity Relic slot unlocks a player could receive.
-        /// </summary>
-        public const int _maxShopRelicSlots = 3;
-
-        /// <summary>
-        /// The maximum number of Shopsanity Potion slot unlocks a player could receive.
-        /// </summary>
-        public const int _maxShopPotionSlots = 3;
-
-        /// <summary>
         /// The maximum Progressive Shop Card Removal level a player could receive (one per Act).
         /// </summary>
         public const int _maxShopRemoves = 3;
-
-        /// <summary>
-        /// The maximum shop checks a player could send.
-        /// </summary>
-        public const int _maxShopChecks = 16;
 
         /// <summary>
         /// The number of floor rewards in floorsanity

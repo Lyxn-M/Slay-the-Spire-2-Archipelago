@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
+using StS2AP.Models;
 using StS2AP.UI.Components;
 using static StS2AP.Patches.Patches_APProgressOnCharSelect;
 
@@ -535,7 +536,12 @@ namespace StS2AP.UI
             // Shopsanity Checks Counter (placed before Press Start and Slayed the Spire)
             if (ArchipelagoClient.Settings.ShopSanity)
             {
-                ShopsanityChecks = new ItemCountLabel("res://images/ui/run_history/shop.png", "(0 / 16)", "AP_REWARD_SHOPSANITY_CHECKS");
+                int totalShopLocations = ArchipelagoClient.Settings.ShopCardSlots
+                    + ArchipelagoClient.Settings.ShopNeutralSlots
+                    + ArchipelagoClient.Settings.ShopRelicSlots
+                    + ArchipelagoClient.Settings.ShopPotionSlots
+                    + (ArchipelagoClient.Settings.ShopRemoveSlots ? ArchipelagoProgress._maxShopRemoves : 0);
+                ShopsanityChecks = new ItemCountLabel("res://images/ui/run_history/shop.png", $"(0 / {totalShopLocations})", "AP_REWARD_SHOPSANITY_CHECKS");
                 AddCheckRow(ShopsanityChecks);
             }
 
@@ -583,25 +589,35 @@ namespace StS2AP.UI
 
             if (ArchipelagoClient.Settings.ShopSanity)
             {
-                // Shop Card Slots Unlocked
-                ShopCardSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_card_back.png", "(0 / 5)", "AP_REWARD_SHOP_CARD_SLOTS");
-                AddItemRow(ShopCardSlots);
+                if (ArchipelagoClient.Settings.ShopCardSlots > 0)
+                {
+                    ShopCardSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_card_back.png", $"(0 / {ArchipelagoClient.Settings.ShopCardSlots})", "AP_REWARD_SHOP_CARD_SLOTS");
+                    AddItemRow(ShopCardSlots);
+                }
 
-                // Shop Neutral/Colorless Slots Unlocked
-                ShopNeutralSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_common_card_reward.png", "(0 / 2)", "AP_REWARD_SHOP_NEUTRAL_SLOTS");
-                AddItemRow(ShopNeutralSlots);
+                if (ArchipelagoClient.Settings.ShopNeutralSlots > 0)
+                {
+                    ShopNeutralSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_common_card_reward.png", $"(0 / {ArchipelagoClient.Settings.ShopNeutralSlots})", "AP_REWARD_SHOP_NEUTRAL_SLOTS");
+                    AddItemRow(ShopNeutralSlots);
+                }
 
-                // Shop Relic Slots Unlocked
-                ShopRelicSlots = new ItemCountLabel("res://images/relics/the_courier.png", "(0 / 3)", "AP_REWARD_SHOP_RELIC_SLOTS");
-                AddItemRow(ShopRelicSlots);
+                if (ArchipelagoClient.Settings.ShopRelicSlots > 0)
+                {
+                    ShopRelicSlots = new ItemCountLabel("res://images/relics/the_courier.png", $"(0 / {ArchipelagoClient.Settings.ShopRelicSlots})", "AP_REWARD_SHOP_RELIC_SLOTS");
+                    AddItemRow(ShopRelicSlots);
+                }
 
-                // Shop Potion Slots Unlocked
-                ShopPotionSlots = new ItemCountLabel("res://images/potions/foul_potion.png", "(0 / 3)", "AP_REWARD_SHOP_POTION_SLOTS");
-                AddItemRow(ShopPotionSlots);
+                if (ArchipelagoClient.Settings.ShopPotionSlots > 0)
+                {
+                    ShopPotionSlots = new ItemCountLabel("res://images/potions/foul_potion.png", $"(0 / {ArchipelagoClient.Settings.ShopPotionSlots})", "AP_REWARD_SHOP_POTION_SLOTS");
+                    AddItemRow(ShopPotionSlots);
+                }
 
-                // Progressive Shop Card Removal
-                ShopRemoves = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_card_removal.png", "(0 / 3)", "AP_REWARD_SHOP_REMOVES");
-                AddItemRow(ShopRemoves);
+                if (ArchipelagoClient.Settings.ShopRemoveSlots)
+                {
+                    ShopRemoves = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_card_removal.png", $"(0 / {ArchipelagoProgress._maxShopRemoves})", "AP_REWARD_SHOP_REMOVES");
+                    AddItemRow(ShopRemoves);
+                }
             }
             if (ArchipelagoClient.Settings.ProgressiveStarterCard)
             {
