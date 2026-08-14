@@ -71,7 +71,7 @@ namespace StS2AP.Models
         /// Controls whether Progressive Ancient choices appear at the start of their act or
         /// immediately in the Archipelago reward menu.
         /// </summary>
-        public AncientRelicLocation AncientRelicLocation { get; set; } = AncientRelicLocation.Anytime;
+        public AncientRelicLocation AncientRelicLocation { get; set; } = AncientRelicLocation.StartOfAct;
 
         /// <summary>
         /// Controls whether Ancient choices use the rolled Ancient, the appropriate act's
@@ -82,7 +82,7 @@ namespace StS2AP.Models
         /// <summary>
         /// Number of Relic receipts that do not need an earned Elite, chest, or Black Star reward.
         /// </summary>
-        public int RelicRewardsAvailableAnytime { get; set; } = 2;
+        public int RelicRewardsAvailableAnytime { get; set; } = 10;
 
         /// <summary>Whether a victory releases the winning character's remaining checks.</summary>
         public bool ReleaseOnVictory { get; set; } = true;
@@ -128,6 +128,8 @@ namespace StS2AP.Models
         /// This value should be between 1 and 100, inclusive.
         /// </summary>
         public int DeathLinkDamagePercent { get; set; }
+
+        public Version? APWorldVersion { get; set;}
 
         #endregion
     }

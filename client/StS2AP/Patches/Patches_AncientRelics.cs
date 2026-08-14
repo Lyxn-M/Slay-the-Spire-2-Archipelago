@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Events;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
+using StS2AP.Data;
 using StS2AP.Extensions;
 using StS2AP.Models;
 using StS2AP.Utils;
@@ -169,6 +170,11 @@ namespace StS2AP.Patches
             var player = GameUtility.CurrentPlayer;
             if (player == null)
                 return;
+            if(ArchipelagoClient.Settings.APWorldVersion <= Constants.VERSION_0_5_3)
+            {
+                // Version is before Ancient Relics could be replaced, so we get out.
+                return;
+            }
 
             var currentAct = player.RunState.CurrentActIndex + 1;
             var maxAct = ArchipelagoClient.Progress.MaxProgressiveAncientLevel(

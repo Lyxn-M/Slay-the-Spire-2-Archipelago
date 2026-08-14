@@ -794,6 +794,10 @@ namespace StS2AP
             }
             ArchipelagoSettings settings = new();
 
+            if(slotData.ContainsKey("mod_compat_version"))
+                if(System.Version.TryParse(Convert.ToString(slotData["mod_compat_version"]), out var apworldVersion))
+                    settings.APWorldVersion = apworldVersion;
+
             // Apply all found settings
             if (slotData.ContainsKey("seeded"))
                 settings.IsSeeded = Convert.ToBoolean(slotData["seeded"]);
@@ -827,7 +831,7 @@ namespace StS2AP
                 {
                     if (charData is JObject)
                     {
-                        var config = CharacterConfig.fromJObject(charData as JObject);
+                        var config = CharacterConfig.fromJObject(charData as JObject, settings.APWorldVersion);
                         if (config != null)
                         {
                             settings.Characters.Add(config.OfficialName, config);
@@ -854,12 +858,16 @@ namespace StS2AP
             if (slotData.ContainsKey("neow_sanity"))
                 settings.NeowSanity = Convert.ToInt32(slotData["neow_sanity"]) != 0;
 
-            settings.AncientRelicLocation = (AncientRelicLocation)Convert.ToInt32(slotData["ancient_relic_location"]);
-            settings.AncientRelicPool = (AncientRelicPoolMode)Convert.ToInt32(slotData["ancient_relic_pool"]);
+            if(slotData.ContainsKey("ancient_relic_location"))
+                settings.AncientRelicLocation = (AncientRelicLocation)Convert.ToInt32(slotData["ancient_relic_location"]);
+            if(slotData.ContainsKey("ancient_relic_pool"))
+                settings.AncientRelicPool = (AncientRelicPoolMode)Convert.ToInt32(slotData["ancient_relic_pool"]);
             // These keys are one APWorld/client contract. Missing values should reject the slot
             // instead of silently changing the run's reward rules.
-            settings.RelicRewardsAvailableAnytime = Convert.ToInt32(slotData["relic_rewards_available_anytime"]);
-            settings.ReleaseOnVictory = Convert.ToBoolean(slotData["release_on_victory"]);
+            if(slotData.ContainsKey("relic_rewards_available_anytime"))
+                settings.RelicRewardsAvailableAnytime = Convert.ToInt32(slotData["relic_rewards_available_anytime"]);
+            if(slotData.ContainsKey("release_on_victory"))
+                settings.ReleaseOnVictory = Convert.ToBoolean(slotData["release_on_victory"]);
 
             if (slotData.ContainsKey("campfire_sanity"))
                 settings.CampfireSanity = Convert.ToInt32(slotData["campfire_sanity"]) != 0;
@@ -873,10 +881,12 @@ namespace StS2AP
             if (slotData.ContainsKey("include_floor_checks"))
                 settings.Floorsanity = Convert.ToInt32(slotData["include_floor_checks"]) != 0;
 
-            settings.ProgressiveStarterCard =
-                Convert.ToInt32(slotData["progressive_starter_card"]) != 0;
-            settings.ProgressiveStarterRelic =
-                Convert.ToInt32(slotData["progressive_starter_relic"]) != 0;
+            if(slotData.ContainsKey("progressive_starter_card"))
+                settings.ProgressiveStarterCard =
+                    Convert.ToInt32(slotData["progressive_starter_card"]) != 0;
+            if(slotData.ContainsKey("progressive_starter_relic"))
+                settings.ProgressiveStarterRelic =
+                    Convert.ToInt32(slotData["progressive_starter_relic"]) != 0;
 
             if (slotData.ContainsKey("shop_sanity"))
                 settings.ShopSanity = Convert.ToInt32(slotData["shop_sanity"]) != 0;
@@ -905,7 +915,6 @@ namespace StS2AP
             {
                 LogUtility.Warn("ShopSanity is enabled but 'shop_sanity_options' was missing or not the expected object shape — all shop slots will read as unlocked.");
             }
-
             // And return it
             return settings;
         }
