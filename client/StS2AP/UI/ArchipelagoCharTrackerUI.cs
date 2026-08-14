@@ -1,6 +1,8 @@
 ﻿using Godot;
 using MegaCrit.Sts2.addons.mega_text;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Potions;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
 using StS2AP.UI.Components;
 using static StS2AP.Patches.Patches_APProgressOnCharSelect;
@@ -100,7 +102,7 @@ namespace StS2AP.UI
         public static ItemCountLabel? RelicRewards { get; private set; }
 
         /// <summary>Tracks the number of Ancient Rewards received from the multiworld.</summary>
-        public static ItemCountLabel? AncientRewards { get; private set; }
+        public static ItemCountLabel? ProgressiveAncients { get; private set; }
 
         /// <summary>Tracks the number of Potion Rewards received from the multiworld.</summary>
         public static ItemCountLabel? PotionRewards { get; private set; }
@@ -128,6 +130,11 @@ namespace StS2AP.UI
 
         /// <summary>Tracks the Progressive Shop Card Removal level received. Only shown when Shopsanity is enabled.</summary>
         public static ItemCountLabel? ShopRemoves { get; private set; }
+        /// <summary>Tracks the number of Progressive Starter Card rewards received.</summary>
+        public static ItemCountLabel? ProgressiveStarterCardLabel { get; private set; }
+
+        /// <summary>Tracks the number of Progressive Starter Relic rewards received.</summary>
+        public static ItemCountLabel? ProgressiveStarterRelicLabel { get; private set; }
 
         #endregion
 
@@ -256,7 +263,7 @@ namespace StS2AP.UI
                 CardRewards          = null;
                 RareCardRewards      = null;
                 RelicRewards         = null;
-                AncientRewards = null;
+                ProgressiveAncients = null;
                 PotionRewards        = null;
                 GoldRewards          = null;
                 ProgressiveRestLabel = null;
@@ -267,6 +274,8 @@ namespace StS2AP.UI
                 ShopRelicSlots       = null;
                 ShopPotionSlots      = null;
                 ShopRemoves          = null;
+                ProgressiveStarterCardLabel = null;
+                ProgressiveStarterRelicLabel = null;
             }
         }
 
@@ -505,7 +514,7 @@ namespace StS2AP.UI
             // Potionsanity Checks Counter
             if(ArchipelagoClient.Settings.PotionSanity)
             {
-                PotionsanityChecks = new ItemCountLabel("res://images/potions/skill_potion.png", "(0 / 0)", "AP_REWARD_POTIONSANITY_CHECKS");
+                PotionsanityChecks = new ItemCountLabel(ModelDb.Potion<SkillPotion>().ImagePath, "(0 / 0)", "AP_REWARD_POTIONSANITY_CHECKS");
                 AddCheckRow(PotionsanityChecks);
             }
 
@@ -553,11 +562,11 @@ namespace StS2AP.UI
             AddItemRow(RelicRewards);
 
             // Ancients Counter
-            AncientRewards = new ItemCountLabel("res://images/relics/tezcataras_candle.png", "0", "AP_REWARD_ANCIENT_REWARDS");
-            AddItemRow(AncientRewards);
+            ProgressiveAncients = new ItemCountLabel("res://images/relics/tezcataras_candle.png", "0", "AP_REWARD_PROGRESSIVE_ANCIENTS");
+            AddItemRow(ProgressiveAncients);
     
             // Potions Counter
-            PotionRewards = new ItemCountLabel("res://images/potions/glowwater_potion.png", "0", "AP_REWARD_POTION_REWARDS");
+            PotionRewards = new ItemCountLabel(ModelDb.Potion<GlowwaterPotion>().ImagePath, "0", "AP_REWARD_POTION_REWARDS");
             AddItemRow(PotionRewards);
 
             // Gold Rewards Total
@@ -593,6 +602,25 @@ namespace StS2AP.UI
                 // Progressive Shop Card Removal
                 ShopRemoves = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_card_removal.png", "(0 / 3)", "AP_REWARD_SHOP_REMOVES");
                 AddItemRow(ShopRemoves);
+            }
+            if (ArchipelagoClient.Settings.ProgressiveStarterCard)
+            {
+                ProgressiveStarterCardLabel = new ItemCountLabel(
+                    ModelDb.Relic<ArchaicTooth>().IconPath,
+                    "(0 / 2)",
+                    "AP_REWARD_PROGRESSIVE_STARTER_CARD"
+                );
+                AddItemRow(ProgressiveStarterCardLabel);
+            }
+
+            if (ArchipelagoClient.Settings.ProgressiveStarterRelic)
+            {
+                ProgressiveStarterRelicLabel = new ItemCountLabel(
+                    ModelDb.Relic<TouchOfOrobas>().IconPath,
+                    "(0 / 2)",
+                    "AP_REWARD_PROGRESSIVE_STARTER_RELIC"
+                );
+                AddItemRow(ProgressiveStarterRelicLabel);
             }
 
             // Set initial values based on the first character from the select screen

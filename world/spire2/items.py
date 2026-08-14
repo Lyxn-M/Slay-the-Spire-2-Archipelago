@@ -12,7 +12,7 @@ class ItemType(Enum):
     CARD_REWARD = auto()
     RARE_CARD_REWARD = auto()
     RELIC = auto()
-    ANCIENT_UNLOCK = auto()
+    PROGRESSIVE_ANCIENT = auto()
     GOLD = auto()
     EVENT = auto()
     CAMPFIRE = auto()
@@ -24,6 +24,8 @@ class ItemType(Enum):
     CHAR_UNLOCK = auto()
     POTION = auto()
     ASCENSION_DOWN = auto()
+    PROGRESSIVE_STARTER_CARD = auto()
+    PROGRESSIVE_STARTER_RELIC = auto()
     # TRAP = auto()
     CAW_CAW = auto()
     BUFF = auto()
@@ -48,11 +50,11 @@ base_item_table: Dict[str, ItemData] = {
     'Card Reward': ItemData(1, ItemType.CARD_REWARD, ItemClassification.progression_deprioritized),
     'Rare Card Reward': ItemData(2, ItemType.RARE_CARD_REWARD, ItemClassification.progression_deprioritized),
     'Relic': ItemData(3, ItemType.RELIC, ItemClassification.progression),
-    'Ancient Unlock': ItemData(4, ItemType.ANCIENT_UNLOCK, ItemClassification.progression),
+    'Progressive Ancient': ItemData(4, ItemType.PROGRESSIVE_ANCIENT, ItemClassification.progression),
     'One Gold': ItemData(5, ItemType.GOLD, ItemClassification.filler),
     'Five Gold': ItemData(6, ItemType.GOLD, ItemClassification.filler),
-    '15 Gold': ItemData(15, ItemType.GOLD, ItemClassification.useful),
-    '30 Gold': ItemData(16, ItemType.GOLD, ItemClassification.progression_deprioritized_skip_balancing),
+    'Combat Gold': ItemData(15, ItemType.GOLD, ItemClassification.useful),
+    'Elite Gold': ItemData(16, ItemType.GOLD, ItemClassification.progression_deprioritized_skip_balancing),
     'Boss Gold': ItemData(17, ItemType.GOLD, ItemClassification.progression),
     'Progressive Rest': ItemData(7, ItemType.CAMPFIRE, ItemClassification.progression),
     'Progressive Smith': ItemData(8, ItemType.CAMPFIRE, ItemClassification.progression),
@@ -63,6 +65,8 @@ base_item_table: Dict[str, ItemData] = {
     'Progressive Shop Remove': ItemData(13, ItemType.SHOP_REMOVE, ItemClassification.progression_deprioritized),
     'Unlock': ItemData(14, ItemType.CHAR_UNLOCK, ItemClassification.progression),
     'Potion': ItemData(18, ItemType.POTION, ItemClassification.useful),
+    'Progressive Starter Card': ItemData(29, ItemType.PROGRESSIVE_STARTER_CARD, ItemClassification.progression),
+    'Progressive Starter Relic': ItemData(30, ItemType.PROGRESSIVE_STARTER_RELIC, ItemClassification.progression),
 
     # Event Items
     'Victory': ItemData(None, ItemType.EVENT, ItemClassification.progression, True, True),

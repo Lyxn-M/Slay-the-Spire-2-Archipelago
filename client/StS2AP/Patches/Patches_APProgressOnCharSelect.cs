@@ -156,7 +156,13 @@ namespace StS2AP.Patches
                 // Update Progressive Smiths/Rests
                 ArchipelagoCharTrackerUI.ProgressiveRestLabel?.SetText($"({ArchipelagoClient.Progress.MaxRestLevel(offset) ?? 0} / 3)");
                 ArchipelagoCharTrackerUI.ProgressiveSmithLabel?.SetText($"({ArchipelagoClient.Progress.MaxSmithLevel(offset) ?? 0} / 3)");
-                ArchipelagoCharTrackerUI.AncientRewards?.SetText($"{ArchipelagoClient.Progress.MaxAncientUnlock(offset)} / 3");
+                ArchipelagoCharTrackerUI.ProgressiveAncients?.SetText($"{ArchipelagoClient.Progress.MaxProgressiveAncientLevel(offset)} / 3");
+
+                ArchipelagoClient.Progress.ProgressiveStarterCards.TryGetValue(offset, out int starterCardTier);
+                ArchipelagoCharTrackerUI.ProgressiveStarterCardLabel?.SetText($"({starterCardTier} / 2)");
+
+                ArchipelagoClient.Progress.ProgressiveStarterRelics.TryGetValue(offset, out int starterRelicTier);
+                ArchipelagoCharTrackerUI.ProgressiveStarterRelicLabel?.SetText($"({starterRelicTier} / 2)");
 
                 // Count Card/Relic/Potion/Progressive Rewards
                 var itemCounts = ArchipelagoClient.Progress.AllReceivedItems
@@ -188,7 +194,7 @@ namespace StS2AP.Patches
 
                 // Update Relic Rewards (both regular and boss relics)
                 var relicCount = itemCounts.TryGetValue(ItemTable.APItem.Relic, out int relicStandard) ? relicStandard : 0;
-                                 //(itemCounts.TryGetValue(ItemTable.APItem.AncientUnlock, out int relicBoss) ? relicBoss : 0);
+                                 //(itemCounts.TryGetValue(ItemTable.APItem.ProgressiveAncient, out int relicBoss) ? relicBoss : 0);
                 ArchipelagoCharTrackerUI.RelicRewards?.SetText(relicCount.ToString());
 
                 // Update Potion Rewards

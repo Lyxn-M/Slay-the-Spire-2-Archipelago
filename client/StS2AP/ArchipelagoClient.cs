@@ -7,15 +7,15 @@ using Archipelago.MultiClient.Net.Models;
 using Godot;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
-using MegaCrit.Sts2.Core.Models.Characters;
 using Newtonsoft.Json.Linq;
 using StS2AP.Data;
+using StS2AP.Extensions;
 using StS2AP.Models;
+using StS2AP.Patches;
 using StS2AP.UI;
 using StS2AP.Utils;
 using STS2RitsuLib;
 using STS2RitsuLib.Data;
-using static StS2AP.Data.CharTable;
 using static StS2AP.Data.ItemTable;
 
 namespace StS2AP
@@ -130,6 +130,76 @@ namespace StS2AP
         /// Spinlock for processing incoming items to ensure that we don't have multiple threads trying to process items at the same time
         /// </summary>
         private static readonly object _itemLock = new();
+
+        // RitsuLib polls top-bar counts every frame. Cache the derived reward count and only
+        // re-enumerate item history when one of its inexpensive inputs changes.
+        private static ArchipelagoProgress? _rewardCountProgress;
+        private static long? _rewardCountCharacterOffset;
+        private static int _rewardCountReceivedItems = -1;
+        private static int _rewardCountUsedItems = -1;
+        private static int _rewardCountGoldRemaining = int.MinValue;
+        private static int _rewardCountRelicChoiceAssignments = -1;
+        private static int _rewardCountRelicsAvailableAnytime = -1;
+        private static int _cachedAvailableRewardCount;
+
+        /// <summary>
+        /// Safely reads whether a character has enough of the requested progressive campfire item
+        /// for the supplied one-based Act. Incoming AP items may be processed off the Godot main
+        /// thread, so top-bar UI reads share the item-processing lock.
+        /// TODO: @Platando: if/once there's clear separation between consumption and producing:
+        /// this lock will stay here but most likely can be removed later
+        /// </summary>
+        internal static bool HasProgressiveCampfireAccess(long characterOffset, int act, bool smith)
+        {
+            lock (_itemLock)
+            {
+                var source = smith ? Progress.ProgressiveSmiths : Progress.ProgressiveRests;
+                return source.TryGetValue(characterOffset, out var maxAct) && maxAct >= act;
+            }
+        }
+
+        /// <summary>
+        /// Returns the number shown on the RitsuLib Archipelago Rewards button. RitsuLib polls
+        /// this from the Godot main thread while incoming items may be processed in the background.
+        /// @Platando same with this stuff as above, lock can probably be removed in the future
+        /// </summary>
+        internal static int GetAvailableRewardCount()
+        {
+            lock (_itemLock)
+            {
+                long? characterOffset = GameUtility.CurrentConfig?.CharOffset;
+                int receivedItems = Progress.AllReceivedItems.Count;
+                int usedItems = Progress.UsedItems.Count;
+                int goldRemaining = Progress.GoldRemaining;
+                int relicChoiceAssignments = Progress.RelicChoiceAssignments.Count;
+                int relicsAvailableAnytime = Progress.RelicRewardsAvailableAnytimeForRun;
+
+                if (ReferenceEquals(_rewardCountProgress, Progress) &&
+                    _rewardCountCharacterOffset == characterOffset &&
+                    _rewardCountReceivedItems == receivedItems &&
+                    _rewardCountUsedItems == usedItems &&
+                    _rewardCountGoldRemaining == goldRemaining &&
+                    _rewardCountRelicChoiceAssignments == relicChoiceAssignments &&
+                    _rewardCountRelicsAvailableAnytime == relicsAvailableAnytime)
+                {
+                    return _cachedAvailableRewardCount;
+                }
+
+                int count = Progress.UnusedItemCount;
+                if (goldRemaining > 0)
+                    count++;
+
+                _rewardCountProgress = Progress;
+                _rewardCountCharacterOffset = characterOffset;
+                _rewardCountReceivedItems = receivedItems;
+                _rewardCountUsedItems = usedItems;
+                _rewardCountGoldRemaining = goldRemaining;
+                _rewardCountRelicChoiceAssignments = relicChoiceAssignments;
+                _rewardCountRelicsAvailableAnytime = relicsAvailableAnytime;
+                _cachedAvailableRewardCount = count;
+                return _cachedAvailableRewardCount;
+            }
+        }
 
         /// <summary>
         /// Fires when the connection state changes
@@ -365,6 +435,10 @@ namespace StS2AP
             }
         }
 
+        /// <summary>
+        /// Initializes the character-select unlock state from authoritative slot data.
+        /// This must happen before the initial received-item queue is allowed to run.
+        /// </summary>
         private static void SetupUnlockedCharacters()
         {
             var characters = Settings.Characters;
@@ -372,20 +446,45 @@ namespace StS2AP
                 Progress.UnlockedCharacters.Select(c => c.Id.Entry),
                 StringComparer.InvariantCultureIgnoreCase
             );
-            bool someoneUnlocked = false;
-            foreach (var c in characters)
+
+            // Initial item callbacks are blocked by ConnectionLock until OnConnected
+            // completes, so the starting Unlock item has not been processed yet. Use
+            // the authoritative slot-data flag to initialize every starting character.
+            foreach (var config in characters.Values.Where(config => !config.Locked))
             {
-                if (ids.Contains(c.Key))
+                // The character may already be present after a reconnect or save restore.
+                if (ids.Contains(config.OfficialName))
                 {
-                    someoneUnlocked = true;
-                    break;
+                    continue;
                 }
+
+                // ModelDb should also work for modded characters to register here
+                var model = ModelDb.AllCharacters.FirstOrDefault(character =>
+                    string.Equals(
+                        character.Id.Entry,
+                        config.OfficialName,
+                        StringComparison.InvariantCultureIgnoreCase
+                    )
+                );
+                if (model == null)
+                {
+                    LogUtility.Warn(
+                        $"Could not resolve starting AP character '{config.OfficialName}'"
+                    );
+                    continue;
+                }
+
+                Progress.UnlockedCharacters.Add(model);
+                ids.Add(model.Id.Entry);
+                LogUtility.Info($"Unlocking starting character {model.Id.Entry} from slot data");
             }
+
+            bool someoneUnlocked = characters.Keys.Any(ids.Contains);
             if (!someoneUnlocked)
             {
-                // Probably someone didn't enter a modded character id correctly
-                // This is a failsafe to hopefully unlock *someone*
-                //var newResult = new List<CharacterModel>();
+                // A configured starting character could not be resolved, most likely
+                // because a modded character ID is wrong or its mod is not loaded.
+                // Keep the existing fail-safe so the character screen is still usable.
                 foreach (var c in ModelDb.AllCharacters)
                 {
                     if (characters.ContainsKey(c.Id.Entry))
@@ -407,7 +506,6 @@ namespace StS2AP
                         $"Force unlocking character {Progress.UnlockedCharacters.First().Id.Entry}"
                     );
                 }
-                //__result = newResult;
             }
         }
 
@@ -465,21 +563,6 @@ namespace StS2AP
                 ArchipelagoConnectionUI.SetCloseButtonEnabled(true);
                 ArchipelagoConnectionUI.SetStatus($"Failed to load settings: {ex.Message}");
                 return;
-            }
-
-            // If all characters should be unlocked, set that up
-            if (Settings.NoCharactersLocked)
-            {
-                CharacterModel[] characters = new CharacterModel[]
-                {
-                    ModelDb.Character<Ironclad>(),
-                    ModelDb.Character<Silent>(),
-                    ModelDb.Character<Regent>(),
-                    ModelDb.Character<Necrobinder>(),
-                    ModelDb.Character<Defect>(),
-                };
-                // TODO: need to include modded characters
-                Progress.UnlockedCharacters.AddRange(characters);
             }
 
             SetupUnlockedCharacters();
@@ -653,8 +736,8 @@ namespace StS2AP
                     if (helper.Index <= Index)
                         return;
 
-                    // Process it
-                    ProcessItem(receivedItem, helper.Index);
+                    // Process on Godot main thread
+                    Patches_ItemProcessor.AddToQueue(new IndexedItemInfo(receivedItem, helper.Index));
 
                     // Keep track of how many messages we've had so far
                     Index++;
@@ -692,270 +775,6 @@ namespace StS2AP
 
         #endregion
 
-        #region Item Processing
-
-        /// <summary>
-        /// Determines what to do with an Item that we've received from Archipelago.
-        /// This function is controlled by a Spinlock, and can only process one item at a time.
-        /// </summary>
-        /// <param name="item">Received Item</param>
-        /// <param name="index">The index of the item in the Archipelago Multiworld</param>
-        private static void ProcessItem(ItemInfo item, int index, bool refresh = true)
-        {
-            // Log the item
-            LogUtility.Success(
-                $"Received: {item.ItemName} from {item.Player.Name} (ID: {item.ItemId} / LocID: {item.LocationId} / Index: {index})"
-            );
-
-            /// Universal items (IDs < 10000) are character-agnostic and handled separately.
-            /// The 10k ID gap ensures universal IDs never collide with character-specific IDs,
-            /// no matter how many characters we add in the future.
-            if (item.ItemId < 10000)
-            {
-                HandleUniversalItem(item, index);
-                if (refresh)
-                    ArchipelagoTopBarUI.RefreshCount();
-                return;
-            }
-
-            // Character-specific items (IDs >= 10000): strip the character offset to get the base item type.
-            switch (item.GetCharacterSpecificItemID())
-            {
-                // Character Unlocks
-                case APItem.Unlock:
-                {
-                    LogUtility.Info("Before GameUtility Unlock");
-                    GameUtility.UnlockCharacter(item);
-                    LogUtility.Info("After GameUtility Unlock");
-
-                    /// Fire the CharacterUnlocked event on the Godot main thread.
-                    /// This allows the character select screen (if open) to immediately
-                    /// refresh the appropriate button without waiting for OnSubmenuOpened.
-                    var offset = item.GetCharacterOffset();
-                    LogUtility.Info("After offset acquisition");
-                    var config = ArchipelagoClient.Settings.Characters.Values.FirstOrDefault(
-                        config => config.CharOffset == offset
-                    );
-                    LogUtility.Info("After Settings check");
-                    if (config == null)
-                    {
-                        LogUtility.Warn($"Got Unlock for character not configured {item.ItemId}");
-                        break;
-                    }
-                    LogUtility.Info("after config null check");
-                    Callable.From(() => CharacterUnlocked?.Invoke(config)).CallDeferred();
-
-                    break;
-                }
-                // Progressive Smiths/Rests
-                case APItem.ProgressiveSmith:
-                    HandleThreshholdItem(item, Progress.ProgressiveSmiths, "Progressive Smiths");
-                    break;
-                case APItem.ProgressiveRest:
-                    HandleThreshholdItem(item, Progress.ProgressiveRests, "Progressive Rests");
-                    break;
-                case APItem.AncientUnlock:
-                    HandleThreshholdItem(item, Progress.AncientUnlocks, "Progressive Rests");
-                    break;
-                // Gold is condensed into a single reward pool
-                case APItem.OneGold:
-                case APItem.FiveGold:
-                case APItem._15Gold:
-                case APItem._30Gold:
-                case APItem.BossGold:
-                {
-                    // Get the IDs for storing the item
-                    var charOffset = item.GetCharacterOffset();
-                    var itemId = item.GetCharacterSpecificItemID();
-
-                    // Add the Gold to the amount we've received
-                    try
-                    {
-                        var haveKey = Progress.GoldReceived.TryGetValue(charOffset, out int gold);
-                        if (!haveKey)
-                            gold = 0;
-                        Progress.GoldReceived[charOffset] =
-                            gold + ItemTable.GoldItemAmounts[itemId];
-                    }
-                    catch (KeyNotFoundException e)
-                    {
-                        LogUtility.Error(
-                            $"GoldItemAmounts does not have a value for this item! ({item.ItemDisplayName} from {item.Player.Name})"
-                        );
-                    }
-                    catch
-                    {
-                        LogUtility.Error(
-                            $"Failed to process Gold when this item was received: ({item.ItemDisplayName} from {item.Player.Name})"
-                        );
-                    }
-
-                    break;
-                }
-                // Shop slot unlocks (cards/neutral/relic/potion) and Progressive Shop Remove.
-                case APItem.ShopCardSlot:
-                case APItem.NeutralShopCardSlot:
-                case APItem.ShopRelicSlot:
-                case APItem.ShopPotionSlot:
-                case APItem.ProgressiveShopRemove:
-                    {
-                        // Get the IDs for storing the item
-                        var itemId = item.GetCharacterSpecificItemID();
-                        var playerId = item.GetCharacterOffset();
-
-                        // Route to the matching per-category tracker
-                        var source = itemId switch
-                        {
-                            APItem.ShopCardSlot => Progress.ShopCardSlotsReceived,
-                            APItem.NeutralShopCardSlot => Progress.ShopNeutralSlotsReceived,
-                            APItem.ShopRelicSlot => Progress.ShopRelicSlotsReceived,
-                            APItem.ShopPotionSlot => Progress.ShopPotionSlotsReceived,
-                            _ => Progress.ShopRemovesReceived,
-                        };
-
-                        // Increment the reward
-                        try
-                        {
-                            var haveKey = source.TryGetValue(playerId, out int amount);
-                            if (!haveKey) amount = 0;
-                            source[playerId] = amount + 1;
-                            LogUtility.Success($"New Value for {itemId} is {source[playerId]}");
-                        }
-                        catch (KeyNotFoundException e)
-                        {
-                            LogUtility.Error($"Shop slot tracker does not have a value for this character! ({item.ItemDisplayName} from {item.Player.Name})");
-                        }
-                        catch
-                        {
-                            LogUtility.Error($"Failed to process Shop Slot item when this item was received: ({item.ItemDisplayName} from {item.Player.Name})");
-                        }
-
-                        break;
-                    }
-                case APItem.SwarmingElites:
-                case APItem.WearyTraveler:
-                case APItem.Poverty:
-                case APItem.TightBelt:
-                case APItem.AscenderBane:
-                case APItem.Inflation:
-                case APItem.Scarcity:
-                case APItem.ToughEnemies:
-                case APItem.DeadlyEnemies:
-                case APItem.DoubleBoss:
-                    Progress.Ascensions.ProcessAscensionLevel(
-                        GameUtility.CurrentConfig,
-                        item,
-                        false
-                    );
-                    Progress.UsedItems.Add(index);
-                    Progress.AllReceivedItems.Add(new IndexedItemInfo(item, index));
-                    break;
-
-                // Everything else ends up in the "reward pool"
-                default:
-                {
-                    Progress.AllReceivedItems.Add(new IndexedItemInfo(item, index));
-                    break;
-                }
-            }
-
-            if (refresh)
-            {
-                // Refresh the unused item count
-                ArchipelagoTopBarUI.RefreshCount();
-            }
-        }
-
-        /// <summary>
-        /// Handles universal items that do not have a character offset baked in.
-        ///
-        /// Universal items have no character offset, so their ItemId is cast directly to APItem
-        /// without any modulo operation. Currently all universal items are combat buffs applied
-        /// via <see cref="BuffUtility"/> at the start of the player's next turn.
-        /// </summary>
-        private static void HandleUniversalItem(ItemInfo item, int index)
-        {
-            // Cast ItemId directly — no modulo needed since universal items have no character offset.
-            var universalId = (APItem)item.ItemId;
-            switch (universalId)
-            {
-                case APItem.FreeAttack:
-                case APItem.FreePower:
-                case APItem.FreeSkill:
-                case APItem.Dexterity:
-                case APItem.Strength:
-                case APItem.Plating:
-                case APItem.Friendship:
-                case APItem.Thorns:
-                case APItem.Buffer:
-                case APItem.Vigor:
-                case APItem.Artifact:
-                case APItem.PostCombatCardUpgrade:
-                case APItem.PostCombatCardRemoval:
-                case APItem.AdditionalCardReward:
-                    BuffUtility.EnqueueBuff(universalId, index);
-                    break;
-                default:
-                    LogUtility.Warn(
-                        $"[ArchipelagoClient] Received unrecognized universal item ID {item.ItemId} ({item.ItemName}) — not handled."
-                    );
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// Helper for handling common threshold containers
-        /// </summary>
-        private static void HandleThreshholdItem(
-            ItemInfo item,
-            Dictionary<long, int> source,
-            string name
-        )
-        {
-            // Get the IDs for storing the item
-            var itemId = item.GetCharacterSpecificItemID();
-            var offset = item.GetCharacterOffset();
-
-            // Increment the reward
-            try
-            {
-                var haveKey = source.TryGetValue(offset, out int amount);
-                if (!haveKey)
-                    amount = 0;
-                source[offset] = amount + 1;
-                LogUtility.Success($"New Value for {name} is {source[offset]}");
-            }
-            catch (KeyNotFoundException e)
-            {
-                LogUtility.Error(
-                    $"{name} does not have a value for this character! ({item.ItemDisplayName} from {item.Player.Name})"
-                );
-            }
-            catch
-            {
-                LogUtility.Error(
-                    $"Failed to process {name} when this item was received: ({item.ItemDisplayName} from {item.Player.Name})"
-                );
-            }
-        }
-
-        public static void ReprocessItems()
-        {
-            for (
-                global::System.Int32 i = 0;
-                i < ArchipelagoClient.Session.Items.AllItemsReceived.Count;
-                i++
-            )
-            {
-                ItemInfo info = ArchipelagoClient.Session.Items.AllItemsReceived[i];
-
-                // i+1 because the index from multiclient .net is essentially 1 based, not 0
-                ProcessItem(info, i + 1, false);
-            }
-        }
-
-        #endregion
-
         #region Slot Information
 
         /// <summary>
@@ -963,10 +782,10 @@ namespace StS2AP
         /// </summary>
         private static ArchipelagoSettings GetPlayerSettings()
         {
-            /// Use the SlotData that was already retrieved during login
-            /// instead of calling Session.DataStorage.GetSlotData() which performs
-            /// a synchronous network call that can deadlock/timeout when the websocket
-            /// thread is busy processing incoming item packets (e.g. on reconnect).
+            // Use the SlotData that was already retrieved during login
+            // instead of calling Session.DataStorage.GetSlotData() which performs
+            // a synchronous network call that can deadlock/timeout when the websocket
+            // thread is busy processing incoming item packets (e.g. on reconnect).
             var slotData = SlotData;
             if (slotData == null || slotData.Count == 0)
             {
@@ -974,6 +793,10 @@ namespace StS2AP
                 throw new InvalidDataException("No slot data found for this player!");
             }
             ArchipelagoSettings settings = new();
+
+            if(slotData.ContainsKey("mod_compat_version"))
+                if(System.Version.TryParse(Convert.ToString(slotData["mod_compat_version"]), out var apworldVersion))
+                    settings.APWorldVersion = apworldVersion;
 
             // Apply all found settings
             if (slotData.ContainsKey("seeded"))
@@ -1001,14 +824,14 @@ namespace StS2AP
                 // Grab the total number of characters
                 settings.TotalCharacters = charsList.Count;
 
-                /// Go through each character and add it to the list of Characters in our settings.
-                /// Slot data from Archipelago.MultiClient.Net is deserialized via Newtonsoft.Json,
-                /// so each entry arrives as a JObject, NOT a Dictionary<string, object>.
+                // Go through each character and add it to the list of Characters in our settings.
+                // Slot data from Archipelago.MultiClient.Net is deserialized via Newtonsoft.Json,
+                // so each entry arrives as a JObject, NOT a Dictionary<string, object>.
                 foreach (var charData in charsList)
                 {
                     if (charData is JObject)
                     {
-                        var config = CharacterConfig.fromJObject(charData as JObject);
+                        var config = CharacterConfig.fromJObject(charData as JObject, settings.APWorldVersion);
                         if (config != null)
                         {
                             settings.Characters.Add(config.OfficialName, config);
@@ -1035,6 +858,17 @@ namespace StS2AP
             if (slotData.ContainsKey("neow_sanity"))
                 settings.NeowSanity = Convert.ToInt32(slotData["neow_sanity"]) != 0;
 
+            if(slotData.ContainsKey("ancient_relic_location"))
+                settings.AncientRelicLocation = (AncientRelicLocation)Convert.ToInt32(slotData["ancient_relic_location"]);
+            if(slotData.ContainsKey("ancient_relic_pool"))
+                settings.AncientRelicPool = (AncientRelicPoolMode)Convert.ToInt32(slotData["ancient_relic_pool"]);
+            // These keys are one APWorld/client contract. Missing values should reject the slot
+            // instead of silently changing the run's reward rules.
+            if(slotData.ContainsKey("relic_rewards_available_anytime"))
+                settings.RelicRewardsAvailableAnytime = Convert.ToInt32(slotData["relic_rewards_available_anytime"]);
+            if(slotData.ContainsKey("release_on_victory"))
+                settings.ReleaseOnVictory = Convert.ToBoolean(slotData["release_on_victory"]);
+
             if (slotData.ContainsKey("campfire_sanity"))
                 settings.CampfireSanity = Convert.ToInt32(slotData["campfire_sanity"]) != 0;
 
@@ -1046,6 +880,13 @@ namespace StS2AP
 
             if (slotData.ContainsKey("include_floor_checks"))
                 settings.Floorsanity = Convert.ToInt32(slotData["include_floor_checks"]) != 0;
+
+            if(slotData.ContainsKey("progressive_starter_card"))
+                settings.ProgressiveStarterCard =
+                    Convert.ToInt32(slotData["progressive_starter_card"]) != 0;
+            if(slotData.ContainsKey("progressive_starter_relic"))
+                settings.ProgressiveStarterRelic =
+                    Convert.ToInt32(slotData["progressive_starter_relic"]) != 0;
 
             if (slotData.ContainsKey("shop_sanity"))
                 settings.ShopSanity = Convert.ToInt32(slotData["shop_sanity"]) != 0;
@@ -1074,18 +915,10 @@ namespace StS2AP
             {
                 LogUtility.Warn("ShopSanity is enabled but 'shop_sanity_options' was missing or not the expected object shape — all shop slots will read as unlocked.");
             }
-
             // And return it
             return settings;
         }
 
         #endregion
-
-        /// <summary>
-        /// Fires when a character unlock item is received and processed.
-        /// Passes the <see cref="CharacterConfig"/> of the character that was just unlocked.
-        /// Always dispatched on the Godot main thread via CallDeferred so UI can safely respond.
-        /// </summary>
-        public static event Action<CharacterConfig> CharacterUnlocked;
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using StS2AP.Models;
 
 namespace StS2AP.Data
 {
@@ -14,7 +15,7 @@ namespace StS2AP.Data
             CardReward = 1,
             RareCardReward = 2,
             Relic = 3,
-            AncientUnlock = 4,
+            ProgressiveAncient = 4,
             OneGold = 5,
             FiveGold = 6,
             ProgressiveRest = 7,
@@ -25,8 +26,8 @@ namespace StS2AP.Data
             ShopPotionSlot = 12,
             ProgressiveShopRemove = 13,
             Unlock = 14,
-            _15Gold = 15,
-            _30Gold = 16,
+            CombatGold = 15,
+            EliteGold = 16,
             BossGold = 17,
             Potion = 18,
             SwarmingElites = 19,
@@ -39,6 +40,8 @@ namespace StS2AP.Data
             ToughEnemies = 26,
             DeadlyEnemies = 27,
             DoubleBoss = 28,
+            ProgressiveStarterCard = 29,
+            ProgressiveStarterRelic = 30,
 
             /// ── Ephemeral Buff items (universal / character-agnostic) ──────────────────
             /// These are one-time-use filler items that apply a temporary in-combat buff
@@ -67,7 +70,7 @@ namespace StS2AP.Data
             { 1, "Card Reward" },
             { 2, "Rare Card Reward" },
             { 3, "Relic" },
-            { 4, "Ancient Unlock" },
+            { 4, "Progressive Ancient" },
             { 5, "One Gold" },
             { 6, "Five Gold" },
             { 7, "Progressive Rest" },
@@ -78,20 +81,22 @@ namespace StS2AP.Data
             { 12, "Shop Potion Slot" },
             { 13, "Progressive Shop Remove" },
             { 14, "Unlock" },
-            { 15, "15 Gold" },
-            { 16, "30 Gold" },
+            { 15, "Combat Gold" },
+            { 16, "Elite Gold" },
             { 17, "Boss Gold" },
             { 18, "Potion" },
-            { 19, "Swarming Elites" },
-            { 20, "Weary Traveler" },
-            { 21, "Poverty" },
-            { 22, "Tight Belt" },
-            { 23, "Ascender's Bane" },
-            { 24, "Inflation" },
-            { 25, "Scarcity" },
-            { 26, "Tough Enemies" },
-            { 27, "Deadly Enemies" },
-            { 28, "Double Boss" },
+            { 19, "Disable Swarming Elites" },
+            { 20, "Disable Weary Traveler" },
+            { 21, "Disable Poverty" },
+            { 22, "Disable Tight Belt" },
+            { 23, "Disable Ascender's Bane" },
+            { 24, "Disable Inflation" },
+            { 25, "Disable Scarcity" },
+            { 26, "Disable Tough Enemies" },
+            { 27, "Disable Deadly Enemies" },
+            { 28, "Disable Double Boss" },
+            { 29, "Progressive Starter Card" },
+            { 30, "Progressive Starter Relic" },
             { 500, "Free Attack" },
             { 501, "Free Power" },
             { 502, "Free Skill" },
@@ -115,8 +120,8 @@ namespace StS2AP.Data
         {
             { APItem.OneGold, 1 },
             { APItem.FiveGold, 5 },
-            { APItem._15Gold, 15 },
-            { APItem._30Gold, 30 },
+            { APItem.CombatGold, 15 },
+            { APItem.EliteGold, 40 },
             { APItem.BossGold, 100 },
         };
 
@@ -130,8 +135,9 @@ namespace StS2AP.Data
               case APItem.RareCardReward:
               case APItem.Relic:
                     return true;
-              case APItem.AncientUnlock:
-                    return false;
+              case APItem.ProgressiveAncient:
+                    // pickup is true if Anytime since Relics are in AP reward menu, false otherwise
+                    return (ArchipelagoClient.Settings?.AncientRelicLocation ?? AncientRelicLocation.Anytime) == AncientRelicLocation.Anytime;
               case APItem.ProgressiveRest:
               case APItem.ProgressiveSmith:
               case APItem.ShopCardSlot:
@@ -139,13 +145,15 @@ namespace StS2AP.Data
               case APItem.ShopRelicSlot:
               case APItem.ShopPotionSlot:
               case APItem.ProgressiveShopRemove:
+              case APItem.ProgressiveStarterCard:
+              case APItem.ProgressiveStarterRelic:
                     return false;
               case APItem.Unlock:
                     return false;
               case APItem.OneGold:
               case APItem.FiveGold:
-              case APItem._15Gold:
-              case APItem._30Gold:
+              case APItem.CombatGold:
+              case APItem.EliteGold:
               case APItem.BossGold:
                     return false;
               case APItem.Potion:

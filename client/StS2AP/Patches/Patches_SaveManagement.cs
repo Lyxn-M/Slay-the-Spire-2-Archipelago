@@ -1,5 +1,6 @@
 ﻿using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Models;
+using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Localization;
@@ -37,31 +38,54 @@ namespace StS2AP.Patches
                 LogUtility.Info($"Current Map node type {RunManager.Instance.DebugOnlyGetState()?.CurrentMapPoint?.PointType}");
                 LogUtility.Info($"Game thinks we should save: {RunManager.Instance.ShouldSave}");
 
-                var maxSaveAct = ArchipelagoClient.Progress.MaxAncientUnlock(GameUtility.CurrentConfig?.CharOffset ?? -1);
+                var maxSaveAct = ArchipelagoClient.Progress.MaxProgressiveAncientLevel(
+                    GameUtility.CurrentConfig?.CharOffset ?? -1
+                );
                 var currentAct = (GameUtility.CurrentPlayer?.RunState.CurrentActIndex ?? 0) + 1;
-                
-                LogUtility.Info($"Max Act: {maxSaveAct} Current Act: {currentAct}");
-                // Goal is to just save on boss kills, treasure rooms, and after ancient selections
+                var currentMapPointType = RunManager
+                    .Instance.DebugOnlyGetState()
+                    ?.CurrentMapPoint?.PointType;
+                var isBossAutosave = preFinishedRoom?.RoomType == RoomType.Boss;
+                var isTreasureAutosave = currentMapPointType == MapPointType.Treasure;
+                var isEligibleSaveLocation =
+                    isBossAutosave
+                    || isTreasureAutosave
+                    || (
+                        preFinishedRoom?.RoomType == RoomType.Event
+                        && currentMapPointType == MapPointType.Ancient
+                    );
+                var ancientRelicLocation = ArchipelagoClient.Settings?.AncientRelicLocation
+                    ?? AncientRelicLocation.Anytime;
+                var ancientIsLocked =
+                    ancientRelicLocation == AncientRelicLocation.StartOfAct
+                    && currentAct > 1
+                    && maxSaveAct < currentAct;
+
+                LogUtility.Info(
+                    $"Max Act: {maxSaveAct} Current Act: {currentAct} " +
+                    $"AncientRelicLocation: {ancientRelicLocation}"
+                );
+                // Save after boss kills, in treasure rooms, and after ancient selections.
                 if (!RunManager.Instance.ShouldSave ||
                     (RunManager.Instance.NetService.Type != MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer && RunManager.Instance.NetService.Type != MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Host)
-                    || (preFinishedRoom?.RoomType != RoomType.Boss
-                    && RunManager.Instance.DebugOnlyGetState()?.CurrentMapPoint?.PointType != MapPointType.Treasure
-                    && !(preFinishedRoom?.RoomType == RoomType.Event && RunManager.Instance.DebugOnlyGetState()?.CurrentMapPoint?.PointType == MapPointType.Ancient))
-                    // Always save on Act 1; otherwise check to see if we have enough ancient unlocks
-                    || (maxSaveAct < currentAct && currentAct > 1))
+                    || !isEligibleSaveLocation
+                    || ancientIsLocked)
                 {
                     LogUtility.Info($"Skipping save {preFinishedRoom?.RoomType}");
                     __result = Task.CompletedTask;
                     return false;
                 }
 
-                LogUtility.Info("Saving to AP");
+                LogUtility.Info("Preparing AP checkpoint save");
                 SerializableRun saveMe = RunManager.Instance.ToSave(preFinishedRoom);
-                __result = asyncSave(saveMe);
+                __result = asyncSave(saveMe, isBossAutosave || isTreasureAutosave);
                 return false;
             }
 
-            public static async Task asyncSave(SerializableRun vanillaSave)
+            public static async Task asyncSave(
+                SerializableRun vanillaSave,
+                bool showAutosaveNotification = false
+            )
             {
                 var saveMe = ArchipelagoClient.Progress.ToSerializable(vanillaSave);
                 var result = JsonSerializer.Serialize(saveMe, SerializationUtility.CombinedOptions.GetTypeInfo(typeof(SerializableAP)));
@@ -72,8 +96,29 @@ namespace StS2AP.Patches
                 }
                 var saveDict = new Dictionary<string, string>();
                 saveDict[GameUtility.CurrentPlayer.getInternalName()] = zipped;
-                ArchipelagoClient.Session.DataStorage[Scope.Slot, $"StS2AP_Saves"]
-                    += Operation.Update(saveDict);
+                const string saveStorageKey = "StS2AP_Saves";
+                var saveOperation = ArchipelagoClient.Session.DataStorage[
+                    Scope.Slot,
+                    saveStorageKey
+                ];
+                saveOperation += Operation.Update(saveDict);
+                if (showAutosaveNotification)
+                {
+                    saveOperation += Callback.Add(
+                        (_, _, _) =>
+                        {
+                            Callable.From(
+                                () => NotificationUtility.ShowRawText(
+                                    "[font_size=80]Game autosaved.[/font_size]",
+                                    timeout: 3.5,
+                                    priority: NotificationUtility.NotificationPriority.High,
+                                    includeInDevConsole: false
+                                )
+                            ).CallDeferred();
+                        }
+                    );
+                }
+                ArchipelagoClient.Session.DataStorage[Scope.Slot, saveStorageKey] = saveOperation;
             }
 
             public static string Zip(string str)
@@ -119,7 +164,7 @@ namespace StS2AP.Patches
             public static bool intercept(NCharacterSelectScreen __instance)
             {
 
-                var charName = __instance.Lobby.LocalPlayer.character.Id.Entry;
+                var charName = BetaMainCompatibility.GetLocalCharacter(__instance.Lobby).Id.Entry;
                 foreach(var entry in GameUtility.APSaves)
                 {
                     if (entry.Value.Length > 0)
@@ -157,19 +202,28 @@ namespace StS2AP.Patches
                 {
                     NAudioManager.Instance?.StopMusic();
                     string saveStr;
-                    var charName = _charSelect.Lobby.LocalPlayer.character.Id.Entry;
+                    var charName = BetaMainCompatibility.GetLocalCharacter(_charSelect.Lobby).Id.Entry;
                     if (GameUtility.APSaves.TryGetValue(charName, out saveStr))
                     {
                         var unzipped = Patches_RunSaveManager.SaveRun.Unzip(saveStr);
                         //LogUtility.Info($"JSON Save data{unzipped}");
                         SerializableAP? result = JsonSerializer.Deserialize<SerializableAP>(unzipped, SerializationUtility.CombinedOptions);
-                        if (result == null)
+                        JsonElement? saveData = result?.SaveData;
+                        if (result == null || saveData == null ||
+                            saveData.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                         {
-                            LogUtility.Error($"Failed to load save");
-                            _charSelect.Lobby.SetReady(ready: true);
+                            LogUtility.Error("Failed to load AP save: save_data was missing");
+                            NotificationUtility.ShowRawText("Failed to load checkpoint. The checkpoint was preserved.");
                             return;
                         }
-                        SerializableRun serializableRun = result.SaveData;
+                        ReadSaveResult<SerializableRun> runResult = JsonSerializationUtility.FromJson<SerializableRun>(saveData.Value.GetRawText());
+                        if (!runResult.Success || runResult.SaveData == null)
+                        {
+                            LogUtility.Error($"Failed to deserialize AP run save: {runResult.ErrorMessage ?? runResult.Status.ToString()}");
+                            NotificationUtility.ShowRawText("Failed to load checkpoint. The checkpoint was preserved.");
+                            return;
+                        }
+                        SerializableRun serializableRun = runResult.SaveData;
                         RunState runState = RunState.FromSerializable(serializableRun);
                         await RunManager.Instance.SetUpSavedSingleplayer(runState, serializableRun);
                         Log.Info($"Continuing run with character: {serializableRun.Players[0].CharacterId}");
@@ -178,7 +232,9 @@ namespace StS2AP.Patches
                         GameUtility.CurrentPlayer = runState.Players[0];
                         GameUtility.CurrentConfig = ArchipelagoClient.Settings.Characters[GameUtility.CurrentPlayer.getInternalName()];
                         ArchipelagoClient.Progress = ArchipelagoProgress.FromSerializable(result, GameUtility.CurrentPlayer);
-                        ArchipelagoClient.ReprocessItems();
+                        RelicCoupons.EnsureOwnedBy(GameUtility.CurrentPlayer, silent: true);
+                        Patches_ItemProcessor.ReprocessItems();
+                        RelicRewardUtility.ReconcileBankedRewards(GameUtility.CurrentPlayer);
                         ArchipelagoClient.Progress.InitializeFromServer(GameUtility.CurrentPlayer);
                         await NGame.Instance.Transition.FadeOut(0.8f, runState.Players[0].Character.CharacterSelectTransitionPath);
                         NGame.Instance.ReactionContainer.InitializeNetworking(new NetSingleplayerGameService());
@@ -189,10 +245,12 @@ namespace StS2AP.Patches
                 }
                 catch (Exception ex)
                 {
-                    LogUtility.Error($"Failed to load AP save: {ex.Message}");
+                    LogUtility.Error($"Failed to load AP save: {ex}");
+                    NotificationUtility.ShowRawText("Failed to load checkpoint. The checkpoint was preserved.");
+                    return;
                 }
-                LogUtility.Error("Somehow got here, but we don't have a save, starting the run");
-                _charSelect.Lobby.SetReady(ready: true);
+                LogUtility.Error("AP save disappeared before it could be loaded; preserving the current run selection");
+                NotificationUtility.ShowRawText("The checkpoint could not be found.");
             }
         }
 
@@ -258,6 +316,7 @@ namespace StS2AP.Patches
                     SfxCmd.Play(runState.Players[0].Character.CharacterTransitionSfx);
 
                     GameUtility.CurrentPlayer = runState.Players[0];
+                    RelicCoupons.EnsureOwnedBy(GameUtility.CurrentPlayer, silent: true);
 
                     await NGame.Instance.Transition.FadeOut(0.8f, runState.Players[0].Character.CharacterSelectTransitionPath);
                     NGame.Instance.ReactionContainer.InitializeNetworking(new NetSingleplayerGameService());

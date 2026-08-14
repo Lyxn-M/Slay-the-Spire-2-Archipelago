@@ -65,6 +65,7 @@ namespace StS2AP.Utils
         {
             ConfiguredAscension.Clear();
             CurrentAscension.Clear();
+            _hoverTip = null;
         }
 
         private void UpdateHoverTip()
@@ -250,6 +251,16 @@ namespace StS2AP.Utils
                                 state.Map.BossMapPoint.RemoveChildPoint(secondBossPoint);
                             }
                         }
+                    }
+                    break;
+                case AscensionLevel.Poverty:
+                    int refund = ArchipelagoClient.Progress.CalculatePovertyRefund();
+                    if(refund > 0)
+                    {
+                        Callable.From(() =>
+                        {
+                            _ = GameUtility.GrantGold(refund);
+                        }).CallDeferred();
                     }
                     break;
                 case AscensionLevel.TightBelt:

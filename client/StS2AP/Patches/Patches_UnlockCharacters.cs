@@ -27,8 +27,6 @@ namespace StS2AP.Patches
             static void Postfix(ref IEnumerable<CharacterModel> __result)
             {
                 LogUtility.Debug($"OverrideUnlockedCharacterData: Overriding unlocked characters. UnlockedCharacters count: {ArchipelagoClient.Progress.UnlockedCharacters.Count}");
-                foreach (var c in ArchipelagoClient.Progress.UnlockedCharacters)
-                    LogUtility.Debug($"OverrideUnlockedCharacterData: Unlocked character in progress: {c.Id.Entry}");
                 __result = ArchipelagoClient.Progress.UnlockedCharacters;
             }
         }
@@ -82,7 +80,7 @@ namespace StS2AP.Patches
         }
 
         /// <summary>
-        /// Subscribes to `ArchipelagoClient.CharacterUnlocked` when the character select screen opens,
+        /// Subscribes to `Patches_ItemProcessor.CharacterUnlocked` when the character select screen opens,
         /// so that receiving an unlock item while the screen is open immediately enables the correct button
         /// without having to close and re-open the screen.
         ///
@@ -118,14 +116,14 @@ namespace StS2AP.Patches
                 if (Handlers.TryGetValue(__instance, out var existing))
                 {
                     LogUtility.Debug("SubscribeToUnlockEventOnOpen: Found stale handler for this instance — removing before re-subscribing");
-                    ArchipelagoClient.CharacterUnlocked -= existing;
+                    Patches_ItemProcessor.CharacterUnlocked -= existing;
                     Handlers.Remove(__instance);
                 }
 
                 // Create a closure-bound handler and store it so we can unsubscribe the exact same delegate later
                 Action<CharacterConfig> handler = config => HandleCharacterUnlocked(__instance, config);
                 Handlers[__instance] = handler;
-                ArchipelagoClient.CharacterUnlocked += handler;
+                Patches_ItemProcessor.CharacterUnlocked += handler;
                 LogUtility.Debug($"SubscribeToUnlockEventOnOpen: Subscribed CharacterUnlocked handler for screen instance. Total active handlers: {Handlers.Count}");
             }
 
@@ -148,7 +146,7 @@ namespace StS2AP.Patches
                     // Remove this handler
                     if (Handlers.TryGetValue(screen, out var handler))
                     {
-                        ArchipelagoClient.CharacterUnlocked -= handler;
+                        Patches_ItemProcessor.CharacterUnlocked -= handler;
                     }
                     Handlers.Remove(screen);
 
@@ -189,7 +187,7 @@ namespace StS2AP.Patches
         }
 
         /// <summary>
-        /// Unsubscribes from `ArchipelagoClient.CharacterUnlocked` when the character select screen closes,
+        /// Unsubscribes from `Patches_ItemProcessor.CharacterUnlocked` when the character select screen closes,
         /// so we don't hold a stale reference to a closed screen.
         /// Uses the Handlers dictionary to look up the exact delegate that was registered on open.
         /// </summary>
@@ -209,7 +207,7 @@ namespace StS2AP.Patches
 
                 if (SubscribeToUnlockEventOnOpen.Handlers.TryGetValue(__instance, out var handler))
                 {
-                    ArchipelagoClient.CharacterUnlocked -= handler;
+                    Patches_ItemProcessor.CharacterUnlocked -= handler;
                     SubscribeToUnlockEventOnOpen.Handlers.Remove(__instance);
                     LogUtility.Debug($"UnsubscribeFromUnlockEventOnClose: Unsubscribed and removed handler. Remaining active handlers: {SubscribeToUnlockEventOnOpen.Handlers.Count}");
                 }

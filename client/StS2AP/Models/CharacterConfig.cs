@@ -1,9 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using StS2AP.Data;
+using MegaCrit.Sts2.Core.Entities.Ascension;
 
 namespace StS2AP.Models
 {
@@ -15,7 +12,7 @@ namespace StS2AP.Models
 
         public CharacterConfig() {  }
 
-        public static CharacterConfig? fromJObject(JObject charObj)
+        public static CharacterConfig? fromJObject(JObject charObj, Version apworldVersion)
         {
 
             CharacterConfig config = new CharacterConfig();
@@ -67,7 +64,21 @@ namespace StS2AP.Models
 
             if(charObj.TryGetValue("ascension", out var ascension))
             {
-                config.Ascension = ascension.ToObject<HashSet<String>>();
+                if(apworldVersion > Constants.VERSION_0_5_3)
+                {
+                    config.Ascension = ascension.ToObject<HashSet<String>>();
+                }
+                else 
+                {
+                    var ascensions = new HashSet<String>();
+                    int ascensionNum = (int) ascension;
+                    for(int i = 1; i <= ascensionNum; i++)
+                    {
+                        ascensions.Add(((AscensionLevel) i).ToString());
+                    }
+                    config.Ascension = ascensions;
+                }
+
             }
             return config;
         }

@@ -2,19 +2,17 @@
 using Archipelago.MultiClient.Net.Models;
 using Godot;
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.DevConsole.ConsoleCommands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Factories;
-using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Characters;
-using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
-using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
@@ -23,8 +21,8 @@ using Newtonsoft.Json.Linq;
 using StS2AP.Extensions;
 using StS2AP.Models;
 using StS2AP.Patches;
-using StS2AP.UI;
 using System.Text.Json;
+using StS2AP.UI;
 using static StS2AP.Data.CharTable;
 
 namespace StS2AP.Utils
@@ -174,21 +172,36 @@ namespace StS2AP.Utils
         /// <param name="relicModel">The pre-assigned relic model to grant.</param>
         public static async Task GrantRelic(RelicModel relicModel)
         {
+            await TryGrantRelic(relicModel);
+        }
+
+        /// <summary>
+        /// Attempts to grant a specific pre-assigned relic and reports whether it was actually obtained.
+        /// Reward UIs must only consume their AP item when this returns true.
+        /// </summary>
+        /// <param name="relicModel">The pre-assigned relic model to grant.</param>
+        public static async Task<bool> TryGrantRelic(RelicModel relicModel)
+        {
             if (CurrentPlayer == null)
             {
                 LogUtility.Warn("Cannot grant relic: no active player (not in a run)");
-                return;
+                return false;
             }
 
             try
             {
-                var relic = relicModel.ToMutable();
+                // some hacky weird mutable changing stuff to make relics with setup for players work
+                var relic = relicModel.IsMutable
+                    ? RelicModel.FromSerializable(relicModel.ToSerializable())
+                    : relicModel.ToMutable();
                 await RelicCmd.Obtain(relic, CurrentPlayer);
                 LogUtility.Success($"Granted pre-assigned relic '{relic.Id}' to player");
+                return true;
             }
             catch (Exception ex)
             {
                 LogUtility.Error($"Failed to grant relic: {ex.Message}");
+                return false;
             }
         }
 
@@ -225,7 +238,7 @@ namespace StS2AP.Utils
         /// Returns the CardReward assigned to the given item index, creating and populating one if it hasn't been assigned yet.
         /// This ensures that even if the player skips a Card Reward, the same three cards are shown next time.
         /// </summary>
-        private static async Task<CardReward?> GetOrAssignCardReward(int index, Player player, bool rare)
+        private static CardReward? GetOrAssignCardReward(int index, Player player, bool rare)
         {
             if (ArchipelagoClient.Progress.CardAssignments.TryGetValue(index, out var existing))
             {
@@ -236,10 +249,12 @@ namespace StS2AP.Utils
             try
             {
                 var rarity = rare ? CardRarityOddsType.BossEncounter : CardRarityOddsType.RegularEncounter;
-                var options = new CardCreationOptions(
-                    new[] { player.Character.CardPool },
-                    CardCreationSource.Encounter,
-                    rarity);
+                var options = BetaMainCompatibility.WithCombatRewardCompatibility(
+                    new CardCreationOptions(
+                        new[] { player.Character.CardPool },
+                        CardCreationSource.Encounter,
+                        rarity)
+                );
 
                 var reward = new CardReward(options, 3, player);
                 reward.Populate();
@@ -256,15 +271,77 @@ namespace StS2AP.Utils
         }
 
         /// <summary>
+        /// Adds a combat-local copy of a selected AP reward card to the draw pile.
+        /// Does nothing when the player is not currently in combat.
+        /// </summary>
+        private static async Task AddCardRewardToCombatDrawPile(CardModel selectedCard, Player player)
+        {
+            if (!CombatManager.Instance.IsInProgress || CombatManager.Instance.IsEnding)
+            {
+                return;
+            }
+
+            var combatState = player.Creature.CombatState;
+            if (combatState == null)
+            {
+                return;
+            }
+
+            try
+            {
+                // Match Player.PopulateCombatState: clone the permanent deck card so upgrades,
+                // enchantments, and other mutable card state carry into combat.
+                var combatCard = combatState.CloneCard(selectedCard);
+                combatCard.DeckVersion = selectedCard;
+
+                var result = await CardPileCmd.AddGeneratedCardToCombat(
+                    combatCard,
+                    PileType.Draw,
+                    player,
+                    CardPilePosition.Random
+                );
+
+                if (result.success)
+                {
+                    // Primary use is to update the draw pile UI so it displays the correct
+                    // number of cards in our draw pile. Without it, it's display is too small
+                    result.cardAdded.Pile?.InvokeCardAddFinished();
+
+                    LogUtility.Success(
+                        $"Added selected AP reward card '{selectedCard.Id}' to the combat draw pile"
+                    );
+                }
+                else
+                {
+                    LogUtility.Warn(
+                        $"Could not add selected AP reward card '{selectedCard.Id}' to the combat draw pile"
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                // The card has already been added to the permanent deck. Do not make the AP
+                // reward claimable again if only the additional combat copy fails.
+                LogUtility.Warn(
+                    $"Failed to add selected AP reward card '{selectedCard.Id}' to the combat draw pile: {ex.Message}"
+                );
+            }
+        }
+
+        /// <summary>
         /// Opens the game's standard card selection screen so the player can pick a card
         /// from a pre-assigned (or freshly generated) card reward pool.
         /// </summary>
         /// <param name="index">The Archipelago item index, used to look up / cache the CardReward in CardAssignments.</param>
         /// <param name="rare">If true, uses boss-encounter rarity odds (higher chance of rares).</param>
-        /// <returns>True if a card was actually added to the player's deck; false if the reward was skipped.</returns>
+        /// <returns>
+        /// True if the reward was consumed by selecting a card or a card-reward alternative;
+        /// false if the reward was skipped.
+        /// </returns>
         public static async Task<bool> GrantCardReward(int index, bool rare = false)
         {
-            if (CurrentPlayer == null)
+            var player = CurrentPlayer;
+            if (player == null)
             {
                 LogUtility.Warn("Cannot grant card reward: no active player (not in a run)");
                 return false;
@@ -273,57 +350,37 @@ namespace StS2AP.Utils
             try
             {
                 // Get or create the cached CardReward for this item index
-                var reward = await GetOrAssignCardReward(index, CurrentPlayer, rare);
+                var reward = GetOrAssignCardReward(index, player, rare);
                 if (reward == null)
                 {
                     LogUtility.Error($"Failed to get or assign card reward for index {index}");
                     return false;
                 }
 
-                // Track how many cards are in the reward before selection
-                int cardCountBefore = reward.Cards.Count();
+                // CardReward.OnSelect may replace the selected card while adding it to the deck
+                // (for example through an Egg relic), so identify the actual resulting deck card.
+                var deckCardsBeforeSelection = player.Deck.Cards.ToHashSet();
 
-                var paelsWing = CurrentPlayer.Relics.OfType<PaelsWing>().FirstOrDefault();
-                int sacrificesBefore = paelsWing?.RewardsSacrificed ?? 0;
-                LogUtility.Info($"[Debug] PaelsWing found: {paelsWing != null}, RewardsSacrificed: {sacrificesBefore}");
-
-                // OnSelectWrapper opens NCardRewardSelectionScreen and waits for the player to pick
-                try
-                {
-                    // Use reflection to invoke the protected OnSelect method:
-                    var onSelectMethod = reward.GetType()
-                        .GetMethod("OnSelect", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    if (onSelectMethod != null && onSelectMethod.ReturnType == typeof(Task<bool>))
-                    {
-                        var task = (Task<bool>)onSelectMethod.Invoke(reward, null)!;
-                        await task;
-                    }
-                    else
-                    {
-                        LogUtility.Error("They removed `CardReward.OnSelect()`, update the mod!");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogUtility.Error("Failed to invoke CardReward.OnSelect(): " + ex.Message);
-                }
-
-                // hopefully this fixes it, it took me a while to figure out
-                await Task.Yield();
-
-                // If the card count decreased, a card was picked (added to deck)
-                int cardCountAfter = reward.Cards.Count();
-                bool cardWasPicked = cardCountAfter < cardCountBefore;
-                bool wasSacrificed = (paelsWing?.RewardsSacrificed ?? 0) > sacrificesBefore;
-                bool rewardConsumed = cardWasPicked || wasSacrificed;
+                // well the decompiled code say we should probably not use this but it seems to work well for our
+                // use case. this replaces the manual card counting we were doing for relics such as pael's wing
+                // but this may impact how easy it is to port to multiplayer
+                bool rewardConsumed = await reward.SelectUnsynchronized();
+                var selectedCards = player.Deck.Cards
+                    .Where(card => !deckCardsBeforeSelection.Contains(card))
+                    .ToList();
 
                 if (rewardConsumed)
                 {
                     ArchipelagoClient.Progress.CardAssignments.Remove(index);
-                    LogUtility.Success(cardWasPicked
+
+                    foreach (var selectedCard in selectedCards)
+                    {
+                        await AddCardRewardToCombatDrawPile(selectedCard, player);
+                    }
+
+                    LogUtility.Success(selectedCards.Count > 0
                         ? "Card reward selection completed — card added to deck"
-                        : "Card reward selection completed — sacrificed via Pael's Wing");
+                        : "Card reward selection completed — non-card option selected");
                 }
                 else
                 {
@@ -573,11 +630,20 @@ namespace StS2AP.Utils
 
                     LogUtility.Success($"TrySetGoalAchieved: Recorded goal for '{charName}'. Total goaled: {_goaledCharacters.Count}");
 
-                    // Now that the character has cleared, we should release all of their checks
-                    await TryReleaseAllCharacterChecks(CurrentPlayer.APName());
-                    foreach(var unrecognized in ArchipelagoClient.Settings.UnrecognizedCharacters.Values)
+                    // Goal progress is independent from whether victory releases this character's checks.
+                    if (settings.ReleaseOnVictory)
                     {
-                        await TryReleaseAllCharacterChecks(unrecognized.Name);
+                        await TryReleaseAllCharacterChecks(CurrentPlayer.APName());
+                        foreach(var unrecognized in ArchipelagoClient.Settings.UnrecognizedCharacters.Values)
+                        {
+                            await TryReleaseAllCharacterChecks(unrecognized.Name);
+                        }
+                    }
+                    else
+                    {
+                        LogUtility.Info(
+                            $"Victory recorded for '{charName}' without releasing remaining checks"
+                        );
                     }
                 }
                 else

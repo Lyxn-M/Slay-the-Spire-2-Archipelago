@@ -8,6 +8,24 @@ using System.Threading.Tasks;
 
 namespace StS2AP.Models
 {
+    
+    // Where you can receive Ancient Relics
+    public enum AncientRelicLocation
+    {
+        StartOfAct = 0,
+        Anytime = 1,
+    }
+
+    // Balanced = Relics from a specific act 2 ancient followed by Relics from a specific act 3 ancient
+    // Chaos = Any act 2 ancient relic followed by any act 3 ancient relic
+    // TrueChaos = Any act 2 or act 3 ancient relic always.
+    public enum AncientRelicPoolMode
+    {
+        Balanced = 0,
+        Chaos = 1,
+        TrueChaos = 2,
+    }
+
     /// <summary>
     /// The settings that a player has configured for their Archipelago Slot.
     /// 
@@ -48,10 +66,33 @@ namespace StS2AP.Models
         public IDictionary<string, CharacterConfig> UnrecognizedCharacters { get; set; } = new ConcurrentDictionary<string, CharacterConfig>(StringComparer.InvariantCultureIgnoreCase);
 
         public bool NeowSanity { get; set; }
+
+        /// <summary>
+        /// Controls whether Progressive Ancient choices appear at the start of their act or
+        /// immediately in the Archipelago reward menu.
+        /// </summary>
+        public AncientRelicLocation AncientRelicLocation { get; set; } = AncientRelicLocation.StartOfAct;
+
+        /// <summary>
+        /// Controls whether Ancient choices use the rolled Ancient, the appropriate act's
+        /// Ancient pool, or the combined Act 2 and Act 3 Ancient pool.
+        /// </summary>
+        public AncientRelicPoolMode AncientRelicPool { get; set; } = AncientRelicPoolMode.Balanced;
+
+        /// <summary>
+        /// Number of Relic receipts that do not need an earned Elite, chest, or Black Star reward.
+        /// </summary>
+        public int RelicRewardsAvailableAnytime { get; set; } = 10;
+
+        /// <summary>Whether a victory releases the winning character's remaining checks.</summary>
+        public bool ReleaseOnVictory { get; set; } = true;
+
         public bool CampfireSanity { get; set; }
         public bool GoldSanity { get; set; }
         public bool PotionSanity { get; set; }
         public bool Floorsanity { get; set; }
+        public bool ProgressiveStarterCard { get; set; }
+        public bool ProgressiveStarterRelic { get; set; }
 
         #region Shop Sanity Settings
 
@@ -87,6 +128,8 @@ namespace StS2AP.Models
         /// This value should be between 1 and 100, inclusive.
         /// </summary>
         public int DeathLinkDamagePercent { get; set; }
+
+        public Version? APWorldVersion { get; set;}
 
         #endregion
     }
