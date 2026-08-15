@@ -91,6 +91,9 @@ namespace StS2AP.Patches
                     __instance.GetParent().AddChildSafely(apPage);
                     apPage.Initialize(inventory, dialogue);
 
+                    KeepExitButtonOnscreen(__instance);
+                    KeepExitButtonOnscreen(apPage);
+
                     // Card removal is vanilla-only, so hide the AP page's copy of it.
                     NMerchantCardRemoval? apPageRemoval = apPage.GetAllSlots().OfType<NMerchantCardRemoval>().FirstOrDefault();
                     if (apPageRemoval != null)
@@ -208,6 +211,15 @@ namespace StS2AP.Patches
                 };
                 fallback.Pressed += onPressed;
                 return fallback;
+            }
+
+            private static void KeepExitButtonOnscreen(NMerchantInventory page)
+            {
+                NBackButton? exitButton = FindDescendant<NBackButton>(page);
+                if (exitButton != null)
+                {
+                    exitButton.TopLevel = true;
+                }
             }
 
             private static T? FindDescendant<T>(Node root) where T : class
