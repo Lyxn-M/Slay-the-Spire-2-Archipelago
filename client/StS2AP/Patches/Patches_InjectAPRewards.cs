@@ -178,11 +178,22 @@ namespace StS2AP.Patches
                     return;
                 }
 
-                if (room.RoomType != RoomType.Treasure
-                    || !RelicRewardUtility.RecordEligibleReward(out var rewardNumber))
+                if (room.RoomType != RoomType.Treasure)
                 {
                     return;
                 }
+
+                // An empty chest is not an eligible relic source. Check this before
+                // recording the attempt so Silver Crucible neither sends a location
+                // nor consumes a reward number or creates a bank.
+                if (!Hook.ShouldGenerateTreasure(player.RunState, player))
+                {
+                    LogUtility.Info("Skipping AP Relic check for an empty treasure chest");
+                    return;
+                }
+
+                if (!RelicRewardUtility.RecordEligibleReward(out var rewardNumber))
+                    return;
 
                 // Opening the chest is the interaction that earns this check. Sending it here
                 // avoids inserting an AP rewards screen between the chest-open animation and the

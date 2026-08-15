@@ -45,7 +45,11 @@ namespace StS2AP.Patches
                 var currentMapPointType = RunManager
                     .Instance.DebugOnlyGetState()
                     ?.CurrentMapPoint?.PointType;
-                var isBossAutosave = preFinishedRoom?.RoomType == RoomType.Boss;
+                // Act 3 has no later supported checkpoint. Preserve its treasure-room save
+                // instead of replacing it after either Act 3 boss.
+                var isBossAutosave =
+                    preFinishedRoom?.RoomType == RoomType.Boss
+                    && currentAct < 3;
                 var isTreasureAutosave = currentMapPointType == MapPointType.Treasure;
                 var isEligibleSaveLocation =
                     isBossAutosave
