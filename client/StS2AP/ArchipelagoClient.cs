@@ -225,6 +225,9 @@ namespace StS2AP
         /// </summary>
         public static string? LastDeathLinkMessage { get; set; }
 
+        private static DateTime? _lastDeathLinkReceivedAt;
+        // Locking because we're reading/writing across threads, and caching can happen
+        private static readonly object _deathLinkLock = new();
         /// <summary>
         /// The UTC timestamp of the most recently received Death Link.
         ///
@@ -234,7 +237,17 @@ namespace StS2AP
         /// Null if no Death Link has been received this session,
         /// or if we're in Curse mode (which doesn't warrant suppression).
         /// </summary>
-        public static DateTime? LastDeathLinkReceivedAt { get; set; }
+        public static DateTime? LastDeathLinkReceivedAt { get {
+            lock(_deathLinkLock)
+            {
+                return _lastDeathLinkReceivedAt;
+            }
+        } set {
+            lock(_deathLinkLock)
+            {
+                _lastDeathLinkReceivedAt = value;
+            }
+        } }
 
         #endregion
 
