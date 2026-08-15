@@ -18,8 +18,12 @@ namespace StS2AP.Patches
     /// </summary>
     public static class Patches_ShopPages
     {
+        // in the future these should probably try use RitsuLib's PrivateField helper
         private static readonly FieldInfo? RugField =
             AccessTools.Field(typeof(NMerchantSlot), "_merchantRug");
+
+        private static readonly FieldInfo? IsHoveredField =
+            AccessTools.Field(typeof(NMerchantSlot), "_isHovered");
 
         private static readonly FieldInfo? ShowPosField =
             AccessTools.Field(typeof(NBackButton), "_showPos");
@@ -533,6 +537,30 @@ namespace StS2AP.Patches
         #endregion
 
         #region Per-Slot Visibility Filter
+
+        /// <summary>
+        /// Merchant slots route both controller FocusEntered and hitbox MouseEntered
+        /// through the same OnFocus method. With both shop pages open, focus restoration
+        /// can deliver both signals before an unfocus, and the base method then tries to
+        /// add the same owner to NHoverTipSet's active dictionary twice.
+        /// </summary>
+        [HarmonyPatch(typeof(NMerchantSlot), "OnFocus")]
+        public static class SuppressDuplicateSlotFocus
+        {
+            [HarmonyPrefix]
+            public static bool Prefix(NMerchantSlot __instance)
+            {
+                if (!ShopPageUtility.HasPages
+                    || RugField?.GetValue(__instance) is not NMerchantInventory rug
+                    || (!ReferenceEquals(rug, ShopPageUtility.VanillaPageInstance)
+                        && !ReferenceEquals(rug, ShopPageUtility.ApPageInstance)))
+                {
+                    return true;
+                }
+
+                return IsHoveredField?.GetValue(__instance) is not true;
+            }
+        }
 
         private static void ApplyPageFilter(NMerchantSlot slot)
         {

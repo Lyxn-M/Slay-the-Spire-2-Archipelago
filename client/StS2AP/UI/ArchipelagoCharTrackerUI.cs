@@ -177,6 +177,14 @@ namespace StS2AP.UI
         #region Public API
 
         /// <summary>
+        /// Whether the tracker has been created and is still backed by a valid Godot node.
+        /// Character selection can fire once before OnSubmenuOpened injects the tracker.
+        /// Basically this is just used to prevent some engine errors upon disconnects
+        /// </summary>
+        public static bool IsInjected =>
+            _rootPanel != null && GodotObject.IsInstanceValid(_rootPanel);
+
+        /// <summary>
         /// Whether the tracker panel is currently present and visible.
         /// </summary>
         public static bool IsVisible => _rootPanel?.Visible ?? false;

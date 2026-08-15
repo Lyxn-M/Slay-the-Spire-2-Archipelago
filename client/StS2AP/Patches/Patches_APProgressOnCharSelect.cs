@@ -22,6 +22,14 @@ namespace StS2AP.Patches
             [HarmonyPostfix]
             public static void Postfix(NCharacterSelectScreen __instance, NCharacterSelectButton charSelectButton, CharacterModel characterModel)
             {
+                // OnSubmenuOpened selects the initial character before it injects the
+                // tracker. CreateUI performs that first refresh once the labels exist.
+                // Part of the fix to prevent the gold issue before character is ready
+                if (!ArchipelagoCharTrackerUI.IsInjected)
+                {
+                    return;
+                }
+
                 ArchipelagoCharTrackerUI.Show();
                 ArchipelagoGoalTrackerUI.Show();
                 UpdateReceivedItems(characterModel);
@@ -142,16 +150,9 @@ namespace StS2AP.Patches
                 long offset = (long) checkMe;
                 // Update Gold Rewards
                 LogUtility.Info($"Checking for gold rewards for character ID {offset}");
-                if (ArchipelagoClient.Progress.GoldReceived.TryGetValue(offset, out int gold))
-                {
-                    LogUtility.Info($"Found gold rewards for character ID {offset}: {gold}");
-                    ArchipelagoCharTrackerUI.GoldRewards?.SetText(gold.ToString());
-                }
-                else
-                {
-                    LogUtility.Error($"No gold rewards found for character ID {offset}");
-                    ArchipelagoCharTrackerUI.GoldRewards?.SetText("0");
-                }
+                ArchipelagoClient.Progress.GoldReceived.TryGetValue(offset, out int gold);
+                LogUtility.Info($"Gold rewards received for character ID {offset}: {gold}");
+                ArchipelagoCharTrackerUI.GoldRewards?.SetText(gold.ToString());
 
                 // Update Progressive Smiths/Rests
                 ArchipelagoCharTrackerUI.ProgressiveRestLabel?.SetText($"({ArchipelagoClient.Progress.MaxRestLevel(offset) ?? 0} / 3)");
