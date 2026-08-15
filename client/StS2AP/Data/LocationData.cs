@@ -160,7 +160,9 @@ namespace StS2AP.Data
         }
         public static List<long> GetShopsanityLocations(CharacterModel character)
         {
-            return GetLocationsByPattern($"{character.APName()} Shop Slot #", 16);
+            return GetLocationsByPattern(
+                $"{character.APName()} Shop Slot #",
+                ArchipelagoClient.Settings.TotalShopLocations);
         }
 
         /// <summary>

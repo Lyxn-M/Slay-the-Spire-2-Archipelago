@@ -104,6 +104,16 @@ namespace StS2AP.Models
         public bool ShopRemoveSlots { get; set; }
         public int ShopSanityCosts { get; set; }
 
+        /// <summary>
+        /// Total number of generic Shop Slot locations generated per character. Enabling card
+        /// removal adds three locations, matching its three progressive act unlock items.
+        /// </summary>
+        public int TotalShopLocations => ShopCardSlots
+            + ShopNeutralSlots
+            + ShopRelicSlots
+            + ShopPotionSlots
+            + (ShopRemoveSlots ? ArchipelagoProgress._maxShopRemoves : 0);
+
         #endregion
 
         #region Death Link Settings

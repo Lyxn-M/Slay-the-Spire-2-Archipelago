@@ -74,7 +74,9 @@ namespace StS2AP.Patches
             private readonly Queue<long> _missing = new();
             public ShopVisitContext(Player player, int act)
             {
-                int ceiling = SlotCeilingForAct(act);
+                int ceiling = Math.Min(
+                    SlotCeilingForAct(act),
+                    ArchipelagoClient.Settings.TotalShopLocations);
                 for (int slot = 1; slot <= ceiling; slot++)
                 {
                     string checkName = $"{player.APName()} Shop Slot {slot}";

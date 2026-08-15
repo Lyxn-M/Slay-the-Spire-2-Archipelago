@@ -544,12 +544,10 @@ namespace StS2AP.UI
             // Shopsanity Checks Counter (placed before Press Start and Slayed the Spire)
             if (ArchipelagoClient.Settings.ShopSanity)
             {
-                int totalShopLocations = ArchipelagoClient.Settings.ShopCardSlots
-                    + ArchipelagoClient.Settings.ShopNeutralSlots
-                    + ArchipelagoClient.Settings.ShopRelicSlots
-                    + ArchipelagoClient.Settings.ShopPotionSlots
-                    + (ArchipelagoClient.Settings.ShopRemoveSlots ? ArchipelagoProgress._maxShopRemoves : 0);
-                ShopsanityChecks = new ItemCountLabel("res://images/ui/run_history/shop.png", $"(0 / {totalShopLocations})", "AP_REWARD_SHOPSANITY_CHECKS");
+                ShopsanityChecks = new ItemCountLabel(
+                    "res://images/ui/run_history/shop.png",
+                    $"(0 / {ArchipelagoClient.Settings.TotalShopLocations})",
+                    "AP_REWARD_SHOPSANITY_CHECKS");
                 AddCheckRow(ShopsanityChecks);
             }
 
