@@ -7,6 +7,8 @@ using Archipelago.MultiClient.Net.MessageLog.Messages;
 using Archipelago.MultiClient.Net.Models;
 using Godot;
 using MegaCrit.Sts2.Core.DevConsole;
+using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.CardPools;
 using MegaCrit.Sts2.Core.Nodes.Debug;
 using MegaCrit.Sts2.Core.RichTextTags;
 using StS2AP.UI;
@@ -191,23 +193,17 @@ namespace StS2AP.Utils
                 case APItem.Potion:
                     return @"[img]res://images/packed/sprite_fonts/potion_icon.png[/img]";
                 case APItem.Unlock:
-                        switch (item.GetCharacterOffset())
-                        {
-                            case (int) APItemCharID.Ironclad:
-                                    return @"[img]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
-                            case (int) APItemCharID.Silent:
-                                    return @"[img]res://images/packed/sprite_fonts/silent_energy_icon.png[/img]";
-                            case (int) APItemCharID.Defect:
-                                    return @"[img]res://images/packed/sprite_fonts/defect_energy_icon.png[/img]";
-                            case (int) APItemCharID.Necrobinder:
-                                    return @"[img]res://images/packed/sprite_fonts/necrobinder_energy_icon.png[/img]";
-                            case (int) APItemCharID.Regent:
-                                    return @"[img]res://images/packed/sprite_fonts/regent_energy_icon.png[/img]";
-                            default:
-                                    // TODO: What to do for modded characters?
-                                    return @"[img]res://images/packed/sprite_fonts/ironclad_energy_icon.png[/img]";
-                        }
-                    return null;
+                    var iconPath = item.GetCharacterOffset() switch
+                    {
+                        (int)APItemCharID.Ironclad => ModelDb.CardPool<IroncladCardPool>().EnergyIconPath,
+                        (int)APItemCharID.Silent => ModelDb.CardPool<SilentCardPool>().EnergyIconPath,
+                        (int)APItemCharID.Defect => ModelDb.CardPool<DefectCardPool>().EnergyIconPath,
+                        (int)APItemCharID.Necrobinder => ModelDb.CardPool<NecrobinderCardPool>().EnergyIconPath,
+                        (int)APItemCharID.Regent => ModelDb.CardPool<RegentCardPool>().EnergyIconPath,
+                        // TODO: What to do for modded characters?
+                        _ => ModelDb.CardPool<IroncladCardPool>().EnergyIconPath,
+                    };
+                    return $"[img]{iconPath}[/img]";
             }
             return null;
         }

@@ -53,6 +53,11 @@ namespace StS2AP.Models
         public const int _maxBossRewards = 3;
 
         /// <summary>
+        /// The maximum Progressive Shop Card Removal level a player could receive (one per Act).
+        /// </summary>
+        public const int _maxShopRemoves = 3;
+
+        /// <summary>
         /// The number of floor rewards in floorsanity
         /// </summary>
         public const int _maxFloorRewards = 47;

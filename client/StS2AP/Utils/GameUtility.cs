@@ -24,6 +24,7 @@ using StS2AP.Patches;
 using System.Text.Json;
 using StS2AP.UI;
 using static StS2AP.Data.CharTable;
+using static StS2AP.Data.ItemTable;
 
 namespace StS2AP.Utils
 {
@@ -257,10 +258,27 @@ namespace StS2AP.Utils
                 );
 
                 var reward = new CardReward(options, 3, player);
-                reward.Populate();
+                var rewardActIndex = rare ? null : GetCardRewardActIndex(index, player);
+                if (rewardActIndex.HasValue)
+                {
+                    Patches_APCardRewardUpgradeOdds.PopulateForAct(
+                        reward,
+                        rewardActIndex.Value
+                    );
+                }
+                else
+                {
+                    reward.Populate();
+                }
 
                 ArchipelagoClient.Progress.CardAssignments[index] = reward;
-                LogUtility.Info($"Pre-assigned card reward for item w/ index {index} (rare={rare})");
+                var rewardActDescription = rewardActIndex.HasValue
+                    ? (rewardActIndex.Value + 1).ToString()
+                    : "current";
+                LogUtility.Info(
+                    $"Pre-assigned card reward for item w/ index {index} " +
+                    $"(rare={rare}, rewardAct={rewardActDescription})"
+                );
                 return reward;
             }
             catch (Exception ex)
@@ -268,6 +286,49 @@ namespace StS2AP.Utils
                 LogUtility.Error($"Failed to pre-assign card reward for item w/ index {index}: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Maps a regular AP Card Reward's stable item ordinal to the act whose native
+        /// card-upgrade odds it should use. AP item indices are stable even when the player
+        /// waits until a later act to claim the reward.
+        /// </summary>
+        private static int? GetCardRewardActIndex(int index, Player player)
+        {
+            if (index < 0)
+                return null;
+
+            var characterOffset = player.Character.GetCharacterOffset();
+            var orderedCardRewardIndices = ArchipelagoClient.Progress.AllReceivedItems
+                .Where(item =>
+                    item.Item.GetCharacterOffset() == characterOffset
+                    && item.Item.GetCharacterSpecificItemID() == APItem.CardReward
+                )
+                .OrderBy(item => item.Index)
+                .Select(item => item.Index)
+                .ToList();
+
+            var rewardOrdinal = orderedCardRewardIndices.IndexOf(index);
+            var shuffleAllCards = ArchipelagoClient.Settings.ShouldShuffleAllCards;
+            var actOneCount = shuffleAllCards ? 7 : 3;
+            var actTwoCount = shuffleAllCards ? 7 : 4;
+            var totalCount = shuffleAllCards
+                ? ArchipelagoProgress._maxCardRewards
+                : ArchipelagoProgress._maxCardRewards / 2;
+
+            if (rewardOrdinal < 0 || rewardOrdinal >= totalCount)
+            {
+                LogUtility.Error(
+                    $"Could not map Card Reward item index {index} to one of " +
+                    $"the expected {totalCount} AP Card Rewards; using the current act's odds"
+                );
+                return null;
+            }
+
+            if (rewardOrdinal < actOneCount)
+                return 0;
+
+            return rewardOrdinal < actOneCount + actTwoCount ? 1 : 2;
         }
 
         /// <summary>

@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Potions;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Screens.CharacterSelect;
+using StS2AP.Models;
 using StS2AP.UI.Components;
 using static StS2AP.Patches.Patches_APProgressOnCharSelect;
 
@@ -85,6 +86,9 @@ namespace StS2AP.UI
         /// <summary>Tracks whether the "Slayed the Spire" check has been earned.</summary>
         public static ItemCountLabel? ClearedCheck { get; private set; }
 
+        /// <summary>Tracks how many Shopsanity AP Checks have been found.</summary>
+        public static ItemCountLabel? ShopsanityChecks { get; private set; }
+
         #endregion
 
         #region AP Item Labels
@@ -113,6 +117,20 @@ namespace StS2AP.UI
         /// <summary>Tracks the number of Progressive Smith rewards received.</summary>
         public static ItemCountLabel? ProgressiveSmithLabel { get; private set; }
 
+        /// <summary>Tracks the number of Shopsanity Card slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopCardSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Neutral/Colorless card slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopNeutralSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Relic slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopRelicSlots { get; private set; }
+
+        /// <summary>Tracks the number of Shopsanity Potion slot unlocks received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopPotionSlots { get; private set; }
+
+        /// <summary>Tracks the Progressive Shop Card Removal level received. Only shown when Shopsanity is enabled.</summary>
+        public static ItemCountLabel? ShopRemoves { get; private set; }
         /// <summary>Tracks the number of Progressive Starter Card rewards received.</summary>
         public static ItemCountLabel? ProgressiveStarterCardLabel { get; private set; }
 
@@ -157,6 +175,14 @@ namespace StS2AP.UI
         #endregion
 
         #region Public API
+
+        /// <summary>
+        /// Whether the tracker has been created and is still backed by a valid Godot node.
+        /// Character selection can fire once before OnSubmenuOpened injects the tracker.
+        /// Basically this is just used to prevent some engine errors upon disconnects
+        /// </summary>
+        public static bool IsInjected =>
+            _rootPanel != null && GodotObject.IsInstanceValid(_rootPanel);
 
         /// <summary>
         /// Whether the tracker panel is currently present and visible.
@@ -251,6 +277,12 @@ namespace StS2AP.UI
                 GoldRewards          = null;
                 ProgressiveRestLabel = null;
                 ProgressiveSmithLabel = null;
+                ShopsanityChecks = null;
+                ShopCardSlots        = null;
+                ShopNeutralSlots     = null;
+                ShopRelicSlots       = null;
+                ShopPotionSlots      = null;
+                ShopRemoves          = null;
                 ProgressiveStarterCardLabel = null;
                 ProgressiveStarterRelicLabel = null;
             }
@@ -475,16 +507,16 @@ namespace StS2AP.UI
             AddCheckRow(RareCardChecks);
 
             // Relic Checks Counter
-            RelicChecks = new ItemCountLabel("res://images/relics/calling_bell.png", "(0 / 0)", "AP_REWARD_RELIC_CHECKS");
+            RelicChecks = new ItemCountLabel(ModelDb.Relic<CallingBell>().IconPath, "(0 / 0)", "AP_REWARD_RELIC_CHECKS");
             AddCheckRow(RelicChecks);
 
-            AncientChecks = new ItemCountLabel("res://images/relics/snecko_eye.png", "(0 / 0)", "AP_REWARD_ANCIENT_CHECKS");
+            AncientChecks = new ItemCountLabel(ModelDb.Relic<SneckoEye>().IconPath, "(0 / 0)", "AP_REWARD_ANCIENT_CHECKS");
             AddCheckRow(AncientChecks);
 
             // Floorsanity Checks Counter (Note: When the Winged Boots are in main, we should use that relic here instead)
             if(ArchipelagoClient.Settings.Floorsanity)
             {
-                FloorsanityChecks = new ItemCountLabel("res://images/relics/planisphere.png", "(0 / 0)", "AP_REWARD_FLOORSANITY_CHECKS");
+                FloorsanityChecks = new ItemCountLabel(ModelDb.Relic<Planisphere>().IconPath, "(0 / 0)", "AP_REWARD_FLOORSANITY_CHECKS");
                 AddCheckRow(FloorsanityChecks);
             }
 
@@ -509,12 +541,22 @@ namespace StS2AP.UI
                 AddCheckRow(CampfiresanityChecks);
             }
 
+            // Shopsanity Checks Counter (placed before Press Start and Slayed the Spire)
+            if (ArchipelagoClient.Settings.ShopSanity)
+            {
+                ShopsanityChecks = new ItemCountLabel(
+                    "res://images/ui/run_history/shop.png",
+                    $"(0 / {ArchipelagoClient.Settings.TotalShopLocations})",
+                    "AP_REWARD_SHOPSANITY_CHECKS");
+                AddCheckRow(ShopsanityChecks);
+            }
+
             // Press Start Counter
             PressStartCheck = new ItemCountLabel("res://images/ui/run_history/neow.png", "—", "AP_REWARD_PRESS_START_CHECK");
             AddCheckRow(PressStartCheck);
 
             // Slayed the Spire Counter
-            ClearedCheck = new ItemCountLabel("res://images/relics/pantograph.png", "—", "AP_REWARD_CLEARED_CHECK");
+            ClearedCheck = new ItemCountLabel(ModelDb.Relic<Pantograph>().IconPath, "—", "AP_REWARD_CLEARED_CHECK");
             AddCheckRow(ClearedCheck);
 
             // ── AP Items ──────────────────────────────────────────────────────
@@ -528,7 +570,7 @@ namespace StS2AP.UI
             AddItemRow(RareCardRewards);
 
             // Relics Counter
-            RelicRewards = new ItemCountLabel("res://images/relics/circlet.png", "0", "AP_REWARD_RELIC_REWARDS");
+            RelicRewards = new ItemCountLabel(ModelDb.Relic<Circlet>().IconPath, "0", "AP_REWARD_RELIC_REWARDS");
             AddItemRow(RelicRewards);
 
             // Ancients Counter
@@ -544,13 +586,45 @@ namespace StS2AP.UI
             AddItemRow(GoldRewards);
 
             // Progressive Rest Total
-            ProgressiveRestLabel = new ItemCountLabel("res://images/relics/regal_pillow.png", "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
+            ProgressiveRestLabel = new ItemCountLabel(ModelDb.Relic<RegalPillow>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
             AddItemRow(ProgressiveRestLabel);
 
             // Progressive Smith Total
-            ProgressiveSmithLabel = new ItemCountLabel("res://images/relics/whetstone.png", "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
+            ProgressiveSmithLabel = new ItemCountLabel(ModelDb.Relic<Whetstone>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
             AddItemRow(ProgressiveSmithLabel);
 
+            if (ArchipelagoClient.Settings.ShopSanity)
+            {
+                if (ArchipelagoClient.Settings.ShopCardSlots > 0)
+                {
+                    ShopCardSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_card_back.png", $"(0 / {ArchipelagoClient.Settings.ShopCardSlots})", "AP_REWARD_SHOP_CARD_SLOTS");
+                    AddItemRow(ShopCardSlots);
+                }
+
+                if (ArchipelagoClient.Settings.ShopNeutralSlots > 0)
+                {
+                    ShopNeutralSlots = new ItemCountLabel("res://images/events/crystal_sphere/crystal_sphere_common_card_reward.png", $"(0 / {ArchipelagoClient.Settings.ShopNeutralSlots})", "AP_REWARD_SHOP_NEUTRAL_SLOTS");
+                    AddItemRow(ShopNeutralSlots);
+                }
+
+                if (ArchipelagoClient.Settings.ShopRelicSlots > 0)
+                {
+                    ShopRelicSlots = new ItemCountLabel(ModelDb.Relic<TheCourier>().IconPath, $"(0 / {ArchipelagoClient.Settings.ShopRelicSlots})", "AP_REWARD_SHOP_RELIC_SLOTS");
+                    AddItemRow(ShopRelicSlots);
+                }
+
+                if (ArchipelagoClient.Settings.ShopPotionSlots > 0)
+                {
+                    ShopPotionSlots = new ItemCountLabel(ModelDb.Potion<FoulPotion>().ImagePath, $"(0 / {ArchipelagoClient.Settings.ShopPotionSlots})", "AP_REWARD_SHOP_POTION_SLOTS");
+                    AddItemRow(ShopPotionSlots);
+                }
+
+                if (ArchipelagoClient.Settings.ShopRemoveSlots)
+                {
+                    ShopRemoves = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_card_removal.png", $"(0 / {ArchipelagoProgress._maxShopRemoves})", "AP_REWARD_SHOP_REMOVES");
+                    AddItemRow(ShopRemoves);
+                }
+            }
             if (ArchipelagoClient.Settings.ProgressiveStarterCard)
             {
                 ProgressiveStarterCardLabel = new ItemCountLabel(

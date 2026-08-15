@@ -22,6 +22,14 @@ namespace StS2AP.Patches
             [HarmonyPostfix]
             public static void Postfix(NCharacterSelectScreen __instance, NCharacterSelectButton charSelectButton, CharacterModel characterModel)
             {
+                // OnSubmenuOpened selects the initial character before it injects the
+                // tracker. CreateUI performs that first refresh once the labels exist.
+                // Part of the fix to prevent the gold issue before character is ready
+                if (!ArchipelagoCharTrackerUI.IsInjected)
+                {
+                    return;
+                }
+
                 ArchipelagoCharTrackerUI.Show();
                 ArchipelagoGoalTrackerUI.Show();
                 UpdateReceivedItems(characterModel);
@@ -92,6 +100,12 @@ namespace StS2AP.Patches
 
                 // Update Goal State
                 ArchipelagoCharTrackerUI.ClearedCheck?.SetText(character.HasCleared() ? "[green][sine]✓[/sine][/green]" : "[red]—[/red]");
+
+                if (ArchipelagoClient.Settings.ShopSanity)
+                {
+                    var shopLocations = LocationData.GetShopsanityLocations(character);
+                    SetCheckedLocation(ArchipelagoCharTrackerUI.ShopsanityChecks, shopLocations, shopLocations.Count);
+                }
             }
 
             /// <summary>
@@ -136,16 +150,9 @@ namespace StS2AP.Patches
                 long offset = (long) checkMe;
                 // Update Gold Rewards
                 LogUtility.Info($"Checking for gold rewards for character ID {offset}");
-                if (ArchipelagoClient.Progress.GoldReceived.TryGetValue(offset, out int gold))
-                {
-                    LogUtility.Info($"Found gold rewards for character ID {offset}: {gold}");
-                    ArchipelagoCharTrackerUI.GoldRewards?.SetText(gold.ToString());
-                }
-                else
-                {
-                    LogUtility.Error($"No gold rewards found for character ID {offset}");
-                    ArchipelagoCharTrackerUI.GoldRewards?.SetText("0");
-                }
+                ArchipelagoClient.Progress.GoldReceived.TryGetValue(offset, out int gold);
+                LogUtility.Info($"Gold rewards received for character ID {offset}: {gold}");
+                ArchipelagoCharTrackerUI.GoldRewards?.SetText(gold.ToString());
 
                 // Update Progressive Smiths/Rests
                 ArchipelagoCharTrackerUI.ProgressiveRestLabel?.SetText($"({ArchipelagoClient.Progress.MaxRestLevel(offset) ?? 0} / 3)");
@@ -199,6 +206,33 @@ namespace StS2AP.Patches
                 else
                 {
                     ArchipelagoCharTrackerUI.PotionRewards?.SetText("0");
+                }
+
+                // Update Shopsanity Item Unlocks (only tracked/shown when Shopsanity is enabled)
+                if (ArchipelagoClient.Settings.ShopSanity)
+                {
+                    int shopCardSlots = ArchipelagoClient.Progress.ShopCardSlotsReceived.TryGetValue(offset, out int cs) ? cs : 0;
+                    ArchipelagoCharTrackerUI.ShopCardSlots?.SetText(
+                        $"({Math.Min(shopCardSlots, ArchipelagoClient.Settings.ShopCardSlots)} / {ArchipelagoClient.Settings.ShopCardSlots})");
+
+                    int shopNeutralSlots = ArchipelagoClient.Progress.ShopNeutralSlotsReceived.TryGetValue(offset, out int ns) ? ns : 0;
+                    ArchipelagoCharTrackerUI.ShopNeutralSlots?.SetText(
+                        $"({Math.Min(shopNeutralSlots, ArchipelagoClient.Settings.ShopNeutralSlots)} / {ArchipelagoClient.Settings.ShopNeutralSlots})");
+
+                    int shopRelicSlots = ArchipelagoClient.Progress.ShopRelicSlotsReceived.TryGetValue(offset, out int rs) ? rs : 0;
+                    ArchipelagoCharTrackerUI.ShopRelicSlots?.SetText(
+                        $"({Math.Min(shopRelicSlots, ArchipelagoClient.Settings.ShopRelicSlots)} / {ArchipelagoClient.Settings.ShopRelicSlots})");
+
+                    int shopPotionSlots = ArchipelagoClient.Progress.ShopPotionSlotsReceived.TryGetValue(offset, out int ps) ? ps : 0;
+                    ArchipelagoCharTrackerUI.ShopPotionSlots?.SetText(
+                        $"({Math.Min(shopPotionSlots, ArchipelagoClient.Settings.ShopPotionSlots)} / {ArchipelagoClient.Settings.ShopPotionSlots})");
+
+                    if (ArchipelagoClient.Settings.ShopRemoveSlots)
+                    {
+                        int shopRemoveLevel = ArchipelagoClient.Progress.MaxShopRemoveLevel(offset) ?? 0;
+                        ArchipelagoCharTrackerUI.ShopRemoves?.SetText(
+                            $"({Math.Min(shopRemoveLevel, ArchipelagoProgress._maxShopRemoves)} / {ArchipelagoProgress._maxShopRemoves})");
+                    }
                 }
             }
         }

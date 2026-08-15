@@ -23,7 +23,13 @@ namespace StS2AP.Utils
                 if (connection is Godot.Collections.Dictionary dict)
                 {
                     var callable = (Callable)dict["callable"];
-                    target.Disconnect(signal, callable);
+                    // only disconnect something that actually was connected
+                    // somewhere in shop sanity caused this I believe but this is still
+                    // better handling than was done before
+                    if (target.IsConnected(signal, callable))
+                    {
+                        target.Disconnect(signal, callable);
+                    }
                 }
             }
         }
