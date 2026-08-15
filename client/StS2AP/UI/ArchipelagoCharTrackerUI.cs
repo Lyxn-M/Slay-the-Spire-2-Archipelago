@@ -499,16 +499,16 @@ namespace StS2AP.UI
             AddCheckRow(RareCardChecks);
 
             // Relic Checks Counter
-            RelicChecks = new ItemCountLabel("res://images/relics/calling_bell.png", "(0 / 0)", "AP_REWARD_RELIC_CHECKS");
+            RelicChecks = new ItemCountLabel(ModelDb.Relic<CallingBell>().IconPath, "(0 / 0)", "AP_REWARD_RELIC_CHECKS");
             AddCheckRow(RelicChecks);
 
-            AncientChecks = new ItemCountLabel("res://images/relics/snecko_eye.png", "(0 / 0)", "AP_REWARD_ANCIENT_CHECKS");
+            AncientChecks = new ItemCountLabel(ModelDb.Relic<SneckoEye>().IconPath, "(0 / 0)", "AP_REWARD_ANCIENT_CHECKS");
             AddCheckRow(AncientChecks);
 
             // Floorsanity Checks Counter (Note: When the Winged Boots are in main, we should use that relic here instead)
             if(ArchipelagoClient.Settings.Floorsanity)
             {
-                FloorsanityChecks = new ItemCountLabel("res://images/relics/planisphere.png", "(0 / 0)", "AP_REWARD_FLOORSANITY_CHECKS");
+                FloorsanityChecks = new ItemCountLabel(ModelDb.Relic<Planisphere>().IconPath, "(0 / 0)", "AP_REWARD_FLOORSANITY_CHECKS");
                 AddCheckRow(FloorsanityChecks);
             }
 
@@ -550,7 +550,7 @@ namespace StS2AP.UI
             AddCheckRow(PressStartCheck);
 
             // Slayed the Spire Counter
-            ClearedCheck = new ItemCountLabel("res://images/relics/pantograph.png", "—", "AP_REWARD_CLEARED_CHECK");
+            ClearedCheck = new ItemCountLabel(ModelDb.Relic<Pantograph>().IconPath, "—", "AP_REWARD_CLEARED_CHECK");
             AddCheckRow(ClearedCheck);
 
             // ── AP Items ──────────────────────────────────────────────────────
@@ -564,7 +564,7 @@ namespace StS2AP.UI
             AddItemRow(RareCardRewards);
 
             // Relics Counter
-            RelicRewards = new ItemCountLabel("res://images/relics/circlet.png", "0", "AP_REWARD_RELIC_REWARDS");
+            RelicRewards = new ItemCountLabel(ModelDb.Relic<Circlet>().IconPath, "0", "AP_REWARD_RELIC_REWARDS");
             AddItemRow(RelicRewards);
 
             // Ancients Counter
@@ -580,11 +580,11 @@ namespace StS2AP.UI
             AddItemRow(GoldRewards);
 
             // Progressive Rest Total
-            ProgressiveRestLabel = new ItemCountLabel("res://images/relics/regal_pillow.png", "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
+            ProgressiveRestLabel = new ItemCountLabel(ModelDb.Relic<RegalPillow>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
             AddItemRow(ProgressiveRestLabel);
 
             // Progressive Smith Total
-            ProgressiveSmithLabel = new ItemCountLabel("res://images/relics/whetstone.png", "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
+            ProgressiveSmithLabel = new ItemCountLabel(ModelDb.Relic<Whetstone>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
             AddItemRow(ProgressiveSmithLabel);
 
             if (ArchipelagoClient.Settings.ShopSanity)
@@ -603,13 +603,13 @@ namespace StS2AP.UI
 
                 if (ArchipelagoClient.Settings.ShopRelicSlots > 0)
                 {
-                    ShopRelicSlots = new ItemCountLabel("res://images/relics/the_courier.png", $"(0 / {ArchipelagoClient.Settings.ShopRelicSlots})", "AP_REWARD_SHOP_RELIC_SLOTS");
+                    ShopRelicSlots = new ItemCountLabel(ModelDb.Relic<TheCourier>().IconPath, $"(0 / {ArchipelagoClient.Settings.ShopRelicSlots})", "AP_REWARD_SHOP_RELIC_SLOTS");
                     AddItemRow(ShopRelicSlots);
                 }
 
                 if (ArchipelagoClient.Settings.ShopPotionSlots > 0)
                 {
-                    ShopPotionSlots = new ItemCountLabel("res://images/potions/foul_potion.png", $"(0 / {ArchipelagoClient.Settings.ShopPotionSlots})", "AP_REWARD_SHOP_POTION_SLOTS");
+                    ShopPotionSlots = new ItemCountLabel(ModelDb.Potion<FoulPotion>().ImagePath, $"(0 / {ArchipelagoClient.Settings.ShopPotionSlots})", "AP_REWARD_SHOP_POTION_SLOTS");
                     AddItemRow(ShopPotionSlots);
                 }
 
