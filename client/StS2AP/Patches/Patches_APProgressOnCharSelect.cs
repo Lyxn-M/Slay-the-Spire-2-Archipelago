@@ -61,7 +61,7 @@ namespace StS2AP.Patches
                 
                 // Update Ancient Locations
                 var ancientLocations = LocationData.GetAncientRewardLocations(character);
-                SetCheckedLocation(ArchipelagoCharTrackerUI.AncientChecks, ancientLocations, ArchipelagoProgress.MaxAncientRewards);
+                SetCheckedLocation(ArchipelagoCharTrackerUI.AncientChecks, ancientLocations, ArchipelagoProgress.MaxConfiguredAncients);
 
 
                 // Update Floorsanity Locations
@@ -154,9 +154,12 @@ namespace StS2AP.Patches
                 LogUtility.Info($"Gold rewards received for character ID {offset}: {gold}");
                 ArchipelagoCharTrackerUI.GoldRewards?.SetText(gold.ToString());
 
-                // Update Progressive Smiths/Rests
-                ArchipelagoCharTrackerUI.ProgressiveRestLabel?.SetText($"({ArchipelagoClient.Progress.MaxRestLevel(offset) ?? 0} / 3)");
-                ArchipelagoCharTrackerUI.ProgressiveSmithLabel?.SetText($"({ArchipelagoClient.Progress.MaxSmithLevel(offset) ?? 0} / 3)");
+                if(ArchipelagoClient.Settings.CampfireSanity)
+                {
+                    // Update Progressive Smiths/Rests
+                    ArchipelagoCharTrackerUI.ProgressiveRestLabel?.SetText($"({ArchipelagoClient.Progress.MaxRestLevel(offset) ?? 0} / 3)");
+                    ArchipelagoCharTrackerUI.ProgressiveSmithLabel?.SetText($"({ArchipelagoClient.Progress.MaxSmithLevel(offset) ?? 0} / 3)");
+                }
                 ArchipelagoCharTrackerUI.ProgressiveAncients?.SetText($"{ArchipelagoClient.Progress.MaxProgressiveAncientLevel(offset)} / 3");
 
                 ArchipelagoClient.Progress.ProgressiveStarterCards.TryGetValue(offset, out int starterCardTier);

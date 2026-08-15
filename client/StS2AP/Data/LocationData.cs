@@ -108,7 +108,8 @@ namespace StS2AP.Data
         /// <returns>A list of location IDs for the specified character's Ancient Rewards.</returns>
         public static List<long> GetAncientRewardLocations(CharacterModel character)
         {
-            return GetLocationsByPattern($"{character.APName()} Ancient Act #", ArchipelagoProgress.MaxAncientRewards);
+            var start = ArchipelagoClient.Settings.NeowSanity ? 1 : 2;
+            return GetLocationsByPattern($"{character.APName()} Ancient Act #", ArchipelagoProgress._maxAncientChecks, start);
         }
 
         /// <summary>
@@ -171,10 +172,10 @@ namespace StS2AP.Data
         /// <param name="pattern">The pattern to match location names against, where '#' will be replaced by the index.</param>
         /// <param name="count">The maximum number of locations to return.</param>
         /// <returns>A list of location IDs that match the pattern. May be empty if something went wrong.</returns>
-        private static List<long> GetLocationsByPattern(string pattern, int count)
+        private static List<long> GetLocationsByPattern(string pattern, int count, int start = 1 )
         {
             List<long> ids = new();
-            for(int i = 1; i <= count; i++)
+            for(int i = start; i <= count; i++)
             {
                 try
                 {

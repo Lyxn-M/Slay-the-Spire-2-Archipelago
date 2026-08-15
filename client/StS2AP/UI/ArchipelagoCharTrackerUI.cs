@@ -585,13 +585,16 @@ namespace StS2AP.UI
             GoldRewards = new ItemCountLabel("res://images/ui/reward_screen/reward_icon_money.png", "0", "AP_REWARD_GOLD_REWARDS");
             AddItemRow(GoldRewards);
 
-            // Progressive Rest Total
-            ProgressiveRestLabel = new ItemCountLabel(ModelDb.Relic<RegalPillow>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
-            AddItemRow(ProgressiveRestLabel);
+            if(ArchipelagoClient.Settings.CampfireSanity)
+            {
+                // Progressive Rest Total
+                ProgressiveRestLabel = new ItemCountLabel(ModelDb.Relic<RegalPillow>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_REST");
+                AddItemRow(ProgressiveRestLabel);
 
-            // Progressive Smith Total
-            ProgressiveSmithLabel = new ItemCountLabel(ModelDb.Relic<Whetstone>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
-            AddItemRow(ProgressiveSmithLabel);
+                // Progressive Smith Total
+                ProgressiveSmithLabel = new ItemCountLabel(ModelDb.Relic<Whetstone>().IconPath, "(0 / 3)", "AP_REWARD_PROGRESSIVE_SMITH");
+                AddItemRow(ProgressiveSmithLabel);
+            }
 
             if (ArchipelagoClient.Settings.ShopSanity)
             {
