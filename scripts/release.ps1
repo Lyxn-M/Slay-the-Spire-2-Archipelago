@@ -6,6 +6,8 @@
   Takes a version string (e.g., "alpha-0.2.1" or "0.3.0"), extracts the semver
   part (major.minor.patch), and updates:
     - StS2AP.csproj:               ModVersion property
+        - local.props.template:        ModVersion property
+        - local.props (when present):  ModVersion property
     - world/spire2/archipelago.json: world_version field
     - client/StS2AP/Archipelago.json: version field
     - world/spire2/world.py:       mod_compat_version field
@@ -74,6 +76,25 @@ if ($csprojNew -ne $csprojContent) {
     Write-Host "  Already up to date: StS2AP.csproj (ModVersion)" -ForegroundColor Yellow
 } else {
     Write-Warning "  No match found in StS2AP.csproj"
+}
+
+# ~ Update local.props.template ModVersion ~
+$localPropsTemplatePath = Join-Path $RepoRoot "client\StS2AP\local.props.template"
+if (-not (Test-Path $localPropsTemplatePath)) {
+    Write-Error "File not found: $localPropsTemplatePath"
+    exit 1
+}
+$localPropsTemplateContent = Get-Content $localPropsTemplatePath -Raw
+$localPropsTemplatePattern = '<ModVersion>[^<]*</ModVersion>'
+$localPropsTemplateReplacement = "<ModVersion>$SemVer</ModVersion>"
+$localPropsTemplateNew = $localPropsTemplateContent -replace $localPropsTemplatePattern, $localPropsTemplateReplacement
+if ($localPropsTemplateNew -ne $localPropsTemplateContent) {
+    Set-Content $localPropsTemplatePath -Value $localPropsTemplateNew -NoNewline
+    Write-Host "  Updated: local.props.template (ModVersion)" -ForegroundColor Green
+} elseif ($localPropsTemplateContent -match $localPropsTemplatePattern) {
+    Write-Host "  Already up to date: local.props.template (ModVersion)" -ForegroundColor Yellow
+} else {
+    Write-Warning "  No match found in local.props.template"
 }
 
 # ~ Update local.props ModVersion ~
@@ -158,6 +179,7 @@ if ($worldPyNew -ne $worldPyContent) {
 Write-Host "`nCommitting version bump..." -ForegroundColor Cyan
 git -C $RepoRoot add `
     "client/StS2AP/StS2AP.csproj" `
+    "client/StS2AP/local.props.template" `
     "client/StS2AP/Archipelago.json" `
     "world/spire2/archipelago.json" `
     "world/spire2/world.py"
@@ -166,13 +188,22 @@ if ($gitAddExit -ne 0) {
     Write-Error "git add failed (exit code $gitAddExit)."
     exit 1
 }
-git -C $RepoRoot commit --message $Version
-$gitCommitExit = $LASTEXITCODE
-if ($gitCommitExit -ne 0) {
-    Write-Error "git commit failed (exit code $gitCommitExit). Are there changes to commit?"
+git -C $RepoRoot diff --cached --quiet
+$gitDiffExit = $LASTEXITCODE
+if ($gitDiffExit -eq 0) {
+    Write-Host "  Version already committed; using current HEAD." -ForegroundColor Yellow
+} elseif ($gitDiffExit -eq 1) {
+    git -C $RepoRoot commit --message $Version
+    $gitCommitExit = $LASTEXITCODE
+    if ($gitCommitExit -ne 0) {
+        Write-Error "git commit failed (exit code $gitCommitExit)."
+        exit 1
+    }
+    Write-Host "  Committed: $Version" -ForegroundColor Green
+} else {
+    Write-Error "git diff failed (exit code $gitDiffExit)."
     exit 1
 }
-Write-Host "  Committed: $Version" -ForegroundColor Green
 
 # ~ Sync world source into Archipelago repo ~
 Write-Host "`nSyncing world source into Archipelago repo..." -ForegroundColor Cyan
