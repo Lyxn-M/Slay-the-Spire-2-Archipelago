@@ -583,26 +583,50 @@ filler_item_options = OptionGroup(
 
 @dataclass
 class Spire2Options(PerGameCommonOptions):
-    death_link: DeathLink
-    enable_death_fragments: EnableDeathFragments
-    death_link_damage_percent: DeathLinkDamagePercent
+    # Character options
     characters: Characters
     modded_characters: ModdedCharacters
     pick_num_characters: PickNumberCharacters
     num_chars_goal: GoalNumChar
     lock_characters: LockCharacters
     unlocked_character: UnlockedCharacter
-    use_advanced_characters: AdvancedChar
-    advanced_characters: CharacterOptions
     # final_act: FinalAct
     ascension: Ascension
     ascension_down: AscensionDown
+
+    # Main game flow
     ancient_relic_location: AncientRelicLocation
     ancient_relic_pool: AncientRelicPool
     relic_rewards_available_anytime: RelicRewardsAvailableAnytime
-    release_on_victory: ReleaseOnVictory
+    progressive_starter_card: ProgressiveStarterCard
+    progressive_starter_relic: ProgressiveStarterRelic
     shuffle_all_cards: CardReward
+
+    # Sanities
     include_floor_checks: IncludeFloorChecks
+    neow_sanity: NeowSanity
+    campfire_sanity: CampfireSanity
+    gold_sanity: GoldSanity
+    potion_sanity: PotionSanity
+    shop_sanity: ShopSanity
+    shop_card_slots: ShopCardSlots
+    shop_neutral_card_slots: ShopNeutralSlots
+    shop_relic_slots: ShopRelicSlots
+    shop_potion_slots: ShopPotionSlots
+    shop_remove_slots: ShopRemoveSlots
+    shop_sanity_costs: ShopSanityCosts
+
+    # Death Link
+    death_link: DeathLink
+    enable_death_fragments: EnableDeathFragments
+    death_link_damage_percent: DeathLinkDamagePercent
+
+    # Advanced options
+    release_on_victory: ReleaseOnVictory
+    seeded: SeededRun
+    use_advanced_characters: AdvancedChar
+    advanced_characters: CharacterOptions
+
     # Filler item weights
     one_gold_filler_weight: OneGoldFillerWeight
     five_gold_filler_weight: FiveGoldFillerWeight
@@ -623,17 +647,3 @@ class Spire2Options(PerGameCommonOptions):
     #single_colorless_card_filler_weight: SingleColorlessCardFillerWeight
     # trap_chance: TrapChance
     # trap_weights: TrapWeights
-    neow_sanity: NeowSanity
-    progressive_starter_card: ProgressiveStarterCard
-    progressive_starter_relic: ProgressiveStarterRelic
-    campfire_sanity: CampfireSanity
-    gold_sanity: GoldSanity
-    potion_sanity: PotionSanity
-    shop_sanity: ShopSanity
-    shop_card_slots: ShopCardSlots
-    shop_neutral_card_slots: ShopNeutralSlots
-    shop_relic_slots: ShopRelicSlots
-    shop_potion_slots: ShopPotionSlots
-    shop_remove_slots: ShopRemoveSlots
-    shop_sanity_costs: ShopSanityCosts
-    seeded: SeededRun
